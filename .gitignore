@@ -1,0 +1,19 @@
+# 中文/English：本机秘密与配置，不进入版本控制 / Local secrets and developer-specific configuration; never commit.
+.env
+# 中文/English：IDE 与操作系统本机文件 / IDE and operating-system-specific files.
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store
+# 中文/English：Python 虚拟环境与缓存 / Python virtual environments and bytecode caches.
+.venv/
+**/.venv/
+**/__pycache__/
+**/*.py[cod]
+# 中文/English：运行日志与临时文件 / Runtime logs and temporary files.
+*.log
+*.tmp
+# 中文/English：Maven 编译产物 / Maven build output.
+backend/target/
+# 中文/English：本地用户文件 / Local uploaded/generated files.
+data/

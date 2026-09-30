@@ -1,0 +1,56 @@
+# 中文：Spring Boot 核心配置。带 ${ENV:default} 的值优先读环境变量，冒号后是本机开发默认值。
+# English: Core Spring Boot settings. ${ENV:default} reads an environment variable first and falls back to the local default.
+spring:
+  application:
+    name: ai-agent-backend
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/agent}
+    username: ${SPRING_DATASOURCE_USERNAME:agent}
+    password: ${SPRING_DATASOURCE_PASSWORD:agent_dev_password}
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+  servlet:
+    multipart:
+      max-file-size: ${APP_MAX_FILE_SIZE:210MB}
+      max-request-size: ${APP_MAX_REQUEST_SIZE:215MB}
+
+# 中文：统一实体字段的驼峰命名与数据库下划线列名映射。
+# English: Map Java camelCase properties to PostgreSQL snake_case columns.
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+server:
+  # 中文：容器内部监听端口；外部端口由 docker-compose.yml 的 BACKEND_PORT 控制。
+  # English: Container listening port; the host-side port is controlled by BACKEND_PORT in docker-compose.yml.
+  port: 8080
+
+agent:
+  service:
+    # 中文：Spring 任务 Worker 调用 Python LangGraph 容器时使用的地址。
+    # English: URL used by Spring task workers to reach the Python LangGraph container.
+    url: ${AGENT_SERVICE_URL:http://localhost:8000}
+  # 中文：仅后端与 Agent 服务共享的服务间令牌；不要放到浏览器或公开日志。
+  # English: Service-to-service token shared only by backend and Agent; never expose it to browsers or public logs.
+  internal-token: ${AGENT_INTERNAL_TOKEN:local-agent-token-change-me}
+
+app:
+  storage:
+    # 中文：上传和结果工作簿的私有存储根目录；Docker Compose 将它挂载到持久化卷。
+    # English: Private root for uploaded and generated workbooks; Compose mounts a persistent volume here.
+    root: ${APP_STORAGE_ROOT:./data/files}
+  jwt:
+    # 中文：用于 HMAC 签名的秘密，至少 32 字节；通过 .env/环境变量注入，不能提交真实值。
+    # English: HMAC signing secret, at least 32 bytes; inject through .env/environment and never commit its real value.
+    secret: ${JWT_SECRET:local-development-jwt-secret-change-me-32-bytes-minimum}
+    expiration-hours: ${JWT_EXPIRATION_HOURS:168}
+  task:
+    # 中文：异步任务线程池参数；队列满时不应无限吞入新任务。
+    # English: Async task-pool limits; a bounded queue prevents unlimited task accumulation.
+    core-pool-size: ${TASK_CORE_POOL_SIZE:4}
+    max-pool-size: ${TASK_MAX_POOL_SIZE:8}
+    queue-capacity: ${TASK_QUEUE_CAPACITY:100}

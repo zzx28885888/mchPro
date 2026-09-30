@@ -1,0 +1,12 @@
+# 中文/English：HTTP API server / 提供健康检查、聊天和工具描述接口。
+fastapi>=0.115,<1
+uvicorn[standard]>=0.34,<1
+# 中文/English：LangGraph orchestration plus the common message/tool abstractions.
+langgraph>=0.6,<2
+langchain-core>=0.3,<2
+# 中文/English：Local Ollama and remote OpenAI-compatible model adapters.
+langchain-ollama>=0.3,<2
+langchain-openai>=0.3,<2
+# 中文/English：Typed request/settings support and async HTTP calls to Java.
+pydantic-settings>=2.7,<3
+httpx>=0.27,<1

@@ -1,0 +1,97 @@
+services:
+  # 中文：PostgreSQL 是 SaaS 账号、文件元数据、套餐和任务状态的持久化数据源。
+  # English: PostgreSQL durably stores SaaS accounts, file metadata, plans, and task records.
+  postgres:
+    image: postgres:17
+    container_name: ai-agent-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agent}
+      POSTGRES_USER: ${POSTGRES_USER:-agent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agent_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agent} -d ${POSTGRES_DB:-agent}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    # 中文：Redis 用于健康检查、任务进度和任务处理期间的 Excel 行集缓存。
+    # English: Redis stores live task progress and temporary per-task Excel rows, and is health-checked by the backend.
+    image: redis:8-alpine
+    container_name: ai-agent-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  agent-service:
+    # 中文：Python/LangGraph 负责理解提示词并决定调用哪些 Java 工具。
+    # English: Python/LangGraph interprets prompts and decides which Java tools to call.
+    build:
+      context: ./agent-service
+    container_name: ai-agent-service
+    restart: unless-stopped
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
+      REMOTE_LLM_BASE_URL: ${REMOTE_LLM_BASE_URL:-}
+      REMOTE_LLM_API_KEY: ${REMOTE_LLM_API_KEY:-}
+      REMOTE_LLM_MODEL: ${REMOTE_LLM_MODEL:-}
+      JAVA_TOOL_REGISTRY_URL: http://backend:8080/internal/agent/tools
+      JAVA_TOOL_PRINCIPAL: langgraph
+      # 中文/English：仅 Agent 与后端共享的内部鉴权令牌 / Internal service token shared with the backend.
+      AGENT_INTERNAL_TOKEN: ${AGENT_INTERNAL_TOKEN:-local-agent-token-change-me}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${AGENT_PORT:-8000}:8000"
+
+  backend:
+    # 中文：Spring Boot 承载页面、认证、业务 API、文件存储适配、任务 Worker 和 Java Tool Registry。
+    # English: Spring Boot serves the UI, auth/business APIs, file-storage adapter, task worker, and Java Tool Registry.
+    build:
+      context: ./backend
+    container_name: ai-agent-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      agent-service:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agent}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-agent}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-agent_dev_password}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      AGENT_SERVICE_URL: http://agent-service:8000
+      AGENT_INTERNAL_TOKEN: ${AGENT_INTERNAL_TOKEN:-local-agent-token-change-me}
+      JWT_SECRET: ${JWT_SECRET:-local-development-jwt-secret-change-me-32-bytes-minimum}
+      APP_STORAGE_ROOT: /app/data/files
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      # 中文：命名卷让容器重建后仍保留用户上传和生成的工作簿。
+      # English: The named volume preserves uploaded and generated workbooks across container recreation.
+      - excel_files:/app/data/files
+
+volumes:
+  postgres_data:
+  redis_data:
+  excel_files:

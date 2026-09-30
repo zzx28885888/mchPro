@@ -1,0 +1,369 @@
+<!doctype html>
+<!--
+  中文：这是由 Spring Boot 从 / 路径直接提供的 SaaS 单页；页面只访问同源 /api 接口。
+  English: Spring Boot serves this SaaS single-page UI at /; browser requests use same-origin /api endpoints.
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7f4">
+  <title>表格助手 · Excel AI</title>
+  <style>
+    /* 中文：颜色 token 集中在 :root，学习或换主题时可优先从这里调整。
+       English: Theme tokens live in :root, making this the first place to adjust the visual theme. */
+    :root {
+      color-scheme: light;
+      --ink: #1f302a;
+      --muted: #6d7d75;
+      --line: #dce5df;
+      --paper: #fff;
+      --wash: #f5f7f4;
+      --green: #196b4a;
+      --green-dark: #105238;
+      --green-soft: #e8f3ec;
+      --amber: #a96819;
+      --red: #a8423b;
+      font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; color: var(--ink); background: var(--wash); }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .shell { width: min(1080px, calc(100% - 40px)); margin: 0 auto; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 25px 0; }
+    .brand { display: flex; align-items: center; gap: 11px; font-weight: 750; letter-spacing: -.03em; }
+    .brand-mark { display: grid; width: 38px; height: 38px; place-items: center; color: white; background: var(--green); border-radius: 12px; font-size: 17px; }
+    .local-tag { padding: 7px 11px; color: var(--green); background: var(--green-soft); border: 1px solid #d3e8db; border-radius: 99px; font-size: 12px; font-weight: 650; }
+    main { padding: 44px 0 80px; }
+    .intro { max-width: 670px; margin: 0 0 32px; }
+    .eyebrow { margin: 0 0 13px; color: var(--green); font-size: 12px; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(34px, 6vw, 54px); letter-spacing: -.055em; line-height: 1.08; }
+    .intro p { margin: 16px 0 0; color: var(--muted); font-size: 16px; line-height: 1.7; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(250px, .75fr); gap: 18px; align-items: start; }
+    .card { padding: 25px; background: var(--paper); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 10px 35px rgb(31 48 42 / 4%); }
+    .card h2 { margin: 0; font-size: 19px; letter-spacing: -.025em; }
+    .card-sub { margin: 7px 0 22px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .tabs { display: flex; gap: 5px; margin-bottom: 20px; padding: 4px; background: var(--wash); border-radius: 10px; }
+    .tab { flex: 1; padding: 9px; color: var(--muted); background: transparent; border: 0; border-radius: 7px; font-size: 13px; font-weight: 650; }
+    .tab.active { color: var(--ink); background: white; box-shadow: 0 1px 4px rgb(31 48 42 / 10%); }
+    label { display: block; margin-bottom: 7px; color: #40534a; font-size: 12px; font-weight: 700; }
+    input[type="email"], input[type="password"], textarea { width: 100%; padding: 12px 13px; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 10px; outline: none; transition: border-color .15s, box-shadow .15s; }
+    input:focus, textarea:focus { border-color: #78aa8e; box-shadow: 0 0 0 3px rgb(25 107 74 / 10%); }
+    .field { margin-bottom: 15px; }
+    .primary, .secondary { min-height: 43px; padding: 11px 15px; border-radius: 10px; font-size: 13px; font-weight: 700; transition: background .15s, transform .15s; }
+    .primary { color: white; background: var(--green); border: 1px solid var(--green); }
+    .primary:hover { background: var(--green-dark); transform: translateY(-1px); }
+    .primary:disabled { cursor: wait; opacity: .6; transform: none; }
+    .secondary { color: var(--ink); background: white; border: 1px solid var(--line); }
+    .secondary:hover { background: var(--wash); }
+    .wide { width: 100%; }
+    .message { display: none; margin-top: 14px; padding: 11px 12px; border-radius: 9px; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+    .message.show { display: block; }
+    .message.info { color: #375d48; background: #eef6f0; }
+    .message.error { color: var(--red); background: #fff0ee; }
+    .workspace { display: none; }
+    .workspace.show { display: block; }
+    .auth-card.hide { display: none; }
+    .user-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
+    .user-state { color: var(--muted); font-size: 12px; }
+    .user-state strong { display: block; margin-bottom: 3px; color: var(--ink); font-size: 14px; }
+    .upload-box { display: flex; align-items: center; gap: 14px; padding: 15px; border: 1px dashed #b9cec0; border-radius: 12px; background: #fbfdfb; }
+    .upload-icon { display: grid; flex: 0 0 40px; width: 40px; height: 40px; place-items: center; color: var(--green); background: var(--green-soft); border-radius: 11px; font-size: 19px; }
+    .upload-copy { flex: 1; min-width: 0; }
+    .upload-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+    .upload-copy span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+    .file-input { max-width: 220px; color: var(--muted); font-size: 11px; }
+    textarea { min-height: 112px; resize: vertical; line-height: 1.55; }
+    .submit-row { display: flex; align-items: center; gap: 12px; margin-top: 17px; }
+    .submit-row .primary { min-width: 148px; }
+    .privacy-note { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .side-card { padding: 22px; }
+    .steps { display: grid; gap: 18px; margin: 23px 0 0; padding: 0; list-style: none; }
+    .step { display: grid; grid-template-columns: 30px 1fr; gap: 11px; align-items: start; }
+    .step-num { display: grid; width: 28px; height: 28px; place-items: center; color: var(--green); background: var(--green-soft); border-radius: 9px; font-size: 12px; font-weight: 750; }
+    .step strong { display: block; margin: 1px 0 4px; font-size: 13px; }
+    .step span { display: block; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .api-note { margin-top: 22px; padding: 13px; color: #5e6d65; background: var(--wash); border-radius: 11px; font-size: 11px; line-height: 1.65; }
+    .api-note code { color: var(--green-dark); font-family: Consolas, monospace; }
+    .result { display: none; margin-top: 15px; padding: 14px; border: 1px solid var(--line); border-radius: 11px; }
+    .result.show { display: block; }
+    .result-top { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
+    .result-top strong { font-size: 13px; }
+    .result-error { margin-top: 8px; color: var(--red); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+    .result .secondary { margin-top: 12px; }
+    footer { margin-top: 30px; color: #87948d; font-size: 11px; text-align: center; }
+    [hidden] { display: none !important; }
+    @media (max-width: 760px) {
+      main { padding-top: 25px; }
+      .layout { grid-template-columns: 1fr; }
+      .side-card { order: 2; }
+      .card { padding: 20px; }
+      .file-input { max-width: 150px; }
+    }
+    @media (max-width: 440px) {
+      .shell { width: min(100% - 24px, 1080px); }
+      header { padding: 16px 0; }
+      .brand { font-size: 14px; }
+      .local-tag { font-size: 10px; }
+      .upload-box { align-items: flex-start; flex-wrap: wrap; }
+      .file-input { flex: 1 1 100%; margin-left: 54px; max-width: calc(100% - 54px); }
+      .submit-row { align-items: flex-start; flex-direction: column; }
+      .submit-row .primary { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">表</span><span>表格助手</span></div>
+      <span class="local-tag">Excel AI · 本地开发版</span>
+    </header>
+
+    <main>
+      <section class="intro">
+        <p class="eyebrow">WORK WITH YOUR SPREADSHEETS</p>
+        <h1>让表格处理<br>变得简单一点。</h1>
+        <p>上传 Excel，用一句话描述你想完成的整理、筛选或排序。任务完成后，可以直接下载结果。</p>
+      </section>
+
+      <div class="layout">
+        <section class="card auth-card" id="authCard" aria-labelledby="authTitle">
+          <h2 id="authTitle">开始使用</h2>
+          <p class="card-sub">登录或创建本地开发账号，继续处理你的表格。</p>
+          <div class="tabs" role="tablist" aria-label="账号操作">
+            <button class="tab active" id="loginTab" type="button" role="tab" aria-selected="true">登录</button>
+            <button class="tab" id="registerTab" type="button" role="tab" aria-selected="false">创建账号</button>
+          </div>
+          <form id="authForm">
+            <div class="field">
+              <label for="email">邮箱</label>
+              <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+            </div>
+            <div class="field">
+              <label for="password">密码</label>
+              <input id="password" name="password" type="password" autocomplete="current-password" minlength="8" placeholder="至少 8 位" required>
+            </div>
+            <button class="primary wide" id="authSubmit" type="submit">登录</button>
+          </form>
+          <div class="message" id="authMessage" role="status" aria-live="polite"></div>
+        </section>
+
+        <section class="card workspace" id="workspace" aria-labelledby="workTitle">
+          <div class="user-bar">
+            <div class="user-state"><strong>工作区已就绪</strong><span>文件会保存在本机服务的数据目录中。</span></div>
+            <button class="secondary" id="logoutButton" type="button">退出登录</button>
+          </div>
+          <h2 id="workTitle">处理一个表格</h2>
+          <p class="card-sub">选择 Excel 文件，再写下你希望 AI 完成的操作。</p>
+          <form id="taskForm">
+            <div class="upload-box">
+              <div class="upload-icon" aria-hidden="true">↥</div>
+              <div class="upload-copy"><strong id="fileName">还没有选择文件</strong><span>支持 .xlsx 和 .xls</span></div>
+              <input class="file-input" id="fileInput" type="file" accept=".xlsx,.xls" required aria-label="选择 Excel 文件">
+            </div>
+            <div class="field" style="margin-top:20px">
+              <label for="prompt">你想怎么处理？</label>
+              <textarea id="prompt" name="prompt" required placeholder="例如：找出销售额最高的 10 条记录，并按销售额从高到低排列。"></textarea>
+            </div>
+            <div class="submit-row">
+              <button class="primary" id="taskSubmit" type="submit">上传并开始处理</button>
+              <span class="privacy-note">开始后请保持此页面打开，完成时会显示下载按钮。</span>
+            </div>
+          </form>
+          <div class="message" id="taskMessage" role="status" aria-live="polite"></div>
+          <div class="result" id="resultPanel" aria-live="polite">
+            <div class="result-top"><strong id="resultTitle">任务状态</strong><span id="resultProgress"></span></div>
+            <div class="result-error" id="resultError" hidden></div>
+            <button class="secondary" id="downloadButton" type="button" hidden>下载处理结果</button>
+          </div>
+        </section>
+
+        <aside class="card side-card">
+          <h2>三步完成</h2>
+          <p class="card-sub">把重复的表格操作交给助手。</p>
+          <ol class="steps">
+            <li class="step"><span class="step-num">1</span><div><strong>创建或登录账号</strong><span>你的文件与任务会关联到当前账号。</span></div></li>
+            <li class="step"><span class="step-num">2</span><div><strong>上传 Excel 并描述需求</strong><span>用自然语言说清筛选、排序或汇总目标。</span></div></li>
+            <li class="step"><span class="step-num">3</span><div><strong>等待任务完成并下载</strong><span>页面会自动查看任务状态并提供结果文件。</span></div></li>
+          </ol>
+          <div class="api-note">这是连接本机 Spring Boot API 的轻量界面。<br>服务地址：<code id="apiOrigin"></code></div>
+        </aside>
+      </div>
+      <footer>表格助手 · 本地开发版</footer>
+    </main>
+  </div>
+
+  <!-- 中文：登录后由本脚本串起上传、任务轮询与结果下载；页面不直接访问 LLM 或工具服务。
+       English: This script connects login, upload, polling, and download; the browser never calls the LLM or tool service directly. -->
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const authCard = $('authCard');
+      const workspace = $('workspace');
+      const authMessage = $('authMessage');
+      const taskMessage = $('taskMessage');
+      const resultPanel = $('resultPanel');
+      let mode = 'login';
+      let token = sessionStorage.getItem('excel-ai-token') || '';
+      let resultFileId = 0;
+      $('apiOrigin').textContent = window.location.origin;
+
+      function showMessage(element, message, type = 'info') {
+        element.textContent = message;
+        element.className = `message show ${type}`;
+      }
+      function clearMessage(element) {
+        element.textContent = '';
+        element.className = 'message';
+      }
+      async function request(path, options = {}) {
+        // 中文：所有同源业务请求共用此封装；存在 JWT 时自动附加 Bearer，并统一解析 JSON 错误。
+        // English: Shared same-origin API wrapper that attaches Bearer JWTs and normalizes JSON error responses.
+        const headers = new Headers(options.headers || {});
+        if (token) headers.set('Authorization', `Bearer ${token}`);
+        const response = await fetch(path, { ...options, headers });
+        const type = response.headers.get('content-type') || '';
+        const body = type.includes('application/json') ? await response.json() : await response.text();
+        if (!response.ok) {
+          const detail = body && typeof body === 'object' ? (body.message || body.error) : body;
+          throw new Error(detail || `请求失败（HTTP ${response.status}）`);
+        }
+        return body;
+      }
+      function setMode(nextMode) {
+        mode = nextMode;
+        const isLogin = mode === 'login';
+        $('loginTab').classList.toggle('active', isLogin);
+        $('registerTab').classList.toggle('active', !isLogin);
+        $('loginTab').setAttribute('aria-selected', String(isLogin));
+        $('registerTab').setAttribute('aria-selected', String(!isLogin));
+        $('authTitle').textContent = isLogin ? '开始使用' : '创建账号';
+        $('authSubmit').textContent = isLogin ? '登录' : '创建账号并登录';
+        $('password').autocomplete = isLogin ? 'current-password' : 'new-password';
+        clearMessage(authMessage);
+      }
+      function showWorkspace() {
+        authCard.classList.add('hide');
+        workspace.classList.add('show');
+      }
+      function signOut() {
+        token = '';
+        sessionStorage.removeItem('excel-ai-token');
+        workspace.classList.remove('show');
+        authCard.classList.remove('hide');
+        setMode('login');
+      }
+
+      $('loginTab').addEventListener('click', () => setMode('login'));
+      $('registerTab').addEventListener('click', () => setMode('register'));
+      $('logoutButton').addEventListener('click', signOut);
+      $('fileInput').addEventListener('change', () => {
+        $('fileName').textContent = $('fileInput').files[0]?.name || '还没有选择文件';
+      });
+
+      $('authForm').addEventListener('submit', async (event) => {
+        // 中文：注册操作随后复用登录接口签发 JWT，因此用户注册完成后直接进入工作区。
+        // English: Registration is followed by login to obtain a JWT, taking the new user straight into the workspace.
+        event.preventDefault();
+        const submit = $('authSubmit');
+        submit.disabled = true;
+        clearMessage(authMessage);
+        const credentials = { email: $('email').value.trim(), password: $('password').value };
+        try {
+          if (mode === 'register') await request('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(credentials) });
+          const result = await request('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(credentials) });
+          token = result.token;
+          sessionStorage.setItem('excel-ai-token', token);
+          showWorkspace();
+        } catch (error) {
+          showMessage(authMessage, error.message || '操作失败，请稍后重试。', 'error');
+        } finally {
+          submit.disabled = false;
+        }
+      });
+
+      async function downloadResult() {
+        const response = await fetch(`/api/files/${resultFileId}/download`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.message || `下载失败（HTTP ${response.status}）`);
+        }
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'excel-ai-result.xlsx';
+        document.body.append(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+      $('downloadButton').addEventListener('click', async () => {
+        try { await downloadResult(); }
+        catch (error) { showMessage(taskMessage, error.message || '下载失败。', 'error'); }
+      });
+
+      async function watchTask(taskId) {
+        // 中文：每 2 秒轮询一次，最多等待约 6 分钟；任务结果由后端按当前用户权限返回。
+        // English: Poll every two seconds for up to about six minutes; the backend scopes task results to the authenticated user.
+        for (let attempt = 0; attempt < 180; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          const task = await request(`/api/tasks/${taskId}`);
+          $('resultTitle').textContent = `任务 #${task.taskId} · ${task.status}`;
+          $('resultProgress').textContent = `${task.progress}%`;
+          if (task.status === 'COMPLETED') {
+            resultFileId = task.resultFileId;
+            $('downloadButton').hidden = !resultFileId;
+            showMessage(taskMessage, '处理完成，可以下载结果文件。');
+            return;
+          }
+          if (task.status === 'FAILED') {
+            $('resultError').textContent = task.error || '任务处理失败。';
+            $('resultError').hidden = false;
+            showMessage(taskMessage, '任务没有完成，请检查提示后重试。', 'error');
+            return;
+          }
+        }
+        showMessage(taskMessage, '任务仍在处理中；你可以稍后刷新任务状态。', 'info');
+      }
+
+      $('taskForm').addEventListener('submit', async (event) => {
+        // 中文：上传与建任务是两个 API 步骤：先拿 fileId，再把 fileId 和自然语言要求提交给任务 API。
+        // English: Upload and task creation are separate API calls: obtain a fileId first, then submit it with the natural-language request.
+        event.preventDefault();
+        const file = $('fileInput').files[0];
+        if (!file) return;
+        const submit = $('taskSubmit');
+        submit.disabled = true;
+        $('downloadButton').hidden = true;
+        $('resultError').hidden = true;
+        resultPanel.classList.add('show');
+        $('resultTitle').textContent = '正在上传文件…';
+        $('resultProgress').textContent = '';
+        clearMessage(taskMessage);
+        try {
+          const form = new FormData();
+          form.append('file', file);
+          const uploaded = await request('/api/files/upload', { method: 'POST', body: form });
+          $('resultTitle').textContent = '文件已上传，正在创建任务…';
+          const created = await request('/api/tasks', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileId: uploaded.fileId, prompt: $('prompt').value.trim() })
+          });
+          $('resultTitle').textContent = `任务 #${created.taskId} · ${created.status}`;
+          $('resultProgress').textContent = '0%';
+          showMessage(taskMessage, '任务已提交，页面会自动更新状态。');
+          await watchTask(created.taskId);
+        } catch (error) {
+          showMessage(taskMessage, error.message || '请求失败，请确认服务正常运行后重试。', 'error');
+          $('resultTitle').textContent = '任务未完成';
+        } finally {
+          submit.disabled = false;
+        }
+      });
+
+      if (token) showWorkspace();
+    })();
+  </script>
+</body>
+</html>
