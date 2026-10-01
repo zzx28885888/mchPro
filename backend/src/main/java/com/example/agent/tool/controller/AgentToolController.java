@@ -29,6 +29,7 @@ public class AgentToolController {
     private final TaskRepository tasks;
     private final UserRepository users;
     private final PlanRepository plans;
+    private final tools.jackson.databind.ObjectMapper mapper = new tools.jackson.databind.ObjectMapper();
     @Value("${agent.internal-token}")
     private String internalToken;
 
@@ -57,21 +58,52 @@ public class AgentToolController {
 
         // 中文：Excel 工具必须绑定真实任务，并再次校验文件归属及套餐许可；不能信任模型提出的用户 ID。
         // English: Excel tools must be tied to a real task, owned input file, and plan grant; model-provided user IDs are never trusted.
-        Map<String, Object> context = request.context() == null ? Map.of() : request.context();
+        Map<String, Object> suppliedContext = request.context() == null ? Map.of() : request.context();
+        Map<String, Object> context = new LinkedHashMap<>(suppliedContext);
+        Set<String> legacyExcelTools = Set.of("read_excel", "filter", "sort", "top", "export_excel");
+        Set<String> workflowTools = Set.of("inspect_workflow_inputs", "merge_clean_workbooks", "reconcile_workbooks", "summarize_workbook", "export_workbook_result");
         Set<String> permissions;
-        if (Set.of("read_excel", "filter", "sort", "top", "export_excel").contains(toolName)) {
-            Long userId = number(context.get("userId"));
-            Long taskId = number(context.get("taskId"));
-            Long inputFileId = number(context.get("inputFileId"));
+        if (legacyExcelTools.contains(toolName) || workflowTools.contains(toolName)) {
+            Long userId = number(suppliedContext.get("userId"));
+            Long taskId = number(suppliedContext.get("taskId"));
+            Long inputFileId = number(suppliedContext.get("inputFileId"));
             var task = userId == null || taskId == null ? null : tasks.owned(taskId, userId);
-            List<Long> taskInputIds = task == null ? List.of() : tasks.inputFileIds(taskId);
-            List<Long> suppliedInputIds = longList(context.get("inputFileIds"));
-            if (suppliedInputIds.isEmpty() && inputFileId != null) suppliedInputIds = List.of(inputFileId);
-            if (task == null || !Objects.equals(task.inputFileId(), inputFileId) || !taskInputIds.equals(suppliedInputIds))
+            List<Long> persistedIds = task == null ? List.of() : tasks.inputFileIds(taskId);
+            List<Long> suppliedIds = suppliedContext.containsKey("inputFileIds") ? longList(suppliedContext.get("inputFileIds")) : List.of();
+            if (!suppliedContext.containsKey("inputFileIds") && inputFileId != null) suppliedIds = List.of(inputFileId);
+            if (task == null || persistedIds.isEmpty() || !Objects.equals(task.inputFileId(), inputFileId) || !persistedIds.equals(suppliedIds))
+                throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN);
+            String persistedWorkflow = task.workflowType() == null ? "FREEFORM" : task.workflowType();
+            if (legacyExcelTools.contains(toolName) && !"FREEFORM".equals(persistedWorkflow))
+                throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN);
+            String suppliedWorkflow = Objects.toString(suppliedContext.get("workflowType"), "FREEFORM");
+            if (!persistedWorkflow.equals(suppliedWorkflow))
+                throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN);
+            if (workflowTools.contains(toolName) && "FREEFORM".equals(persistedWorkflow))
+                throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN);
+            String requiredWorkflow = switch (toolName) {
+                case "merge_clean_workbooks" -> "MERGE_CLEAN";
+                case "reconcile_workbooks" -> "RECONCILE";
+                case "summarize_workbook" -> "SUMMARY";
+                default -> persistedWorkflow;
+            };
+            if (!requiredWorkflow.equals(persistedWorkflow))
                 throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN);
             String plan = users.findById(userId).planCode();
             if (!plans.toolEnabled(plan, toolName))
                 throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN);
+            context.put("userId", userId);
+            context.put("taskId", taskId);
+            context.put("inputFileId", task.inputFileId());
+            context.put("inputFileIds", persistedIds);
+            context.put("workflowType", persistedWorkflow);
+            if (workflowTools.contains(toolName)) {
+                try {
+                    context.put("options", mapper.readValue(task.workflowOptions(), new tools.jackson.core.type.TypeReference<Map<String, Object>>() { }));
+                } catch (Exception e) {
+                    throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            }
             permissions = Set.of("excel:" + toolName);
         } else {
             permissions = request.principal().equals("langgraph") ? Set.of("user:read", "order:read", "debug:read") : Set.of();

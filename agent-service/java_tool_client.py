@@ -47,7 +47,7 @@ class JavaToolRegistryClient:
         payload = {
             "arguments": arguments,
             "principal": self.principal,
-            "context": {k: ctx[k] for k in ("userId", "taskId", "inputFileId") if k in ctx},
+            "context": {k: ctx[k] for k in ("userId", "taskId", "inputFileId", "inputFileIds", "workflowType", "options", "maxToolCalls") if k in ctx},
         }
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(

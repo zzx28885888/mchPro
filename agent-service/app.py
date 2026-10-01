@@ -47,7 +47,7 @@ async def chat(req: ChatRequest):
     try:
         max_calls = int(req.context.get("maxToolCalls", 8))
         result = await graph.ainvoke(
-            {"messages": [{"role": "user", "content": req.message}]},
+            {"messages": [{"role": "user", "content": req.message}], "workflow_context": {"workflowType": req.context.get("workflowType", "FREEFORM"), "options": req.context.get("options", {})}},
             config={"recursion_limit": max(25, max_calls * 2 + 5)},
         )
     finally:

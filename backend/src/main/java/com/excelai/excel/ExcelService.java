@@ -118,7 +118,7 @@ public class ExcelService {
              org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(input)) {
             boolean changed = false;
             for (OutputSheet output : outputSheets) {
-                if (output.headers().size() != 2 || output.rows().isEmpty()) continue;
+                if (!"summary".equalsIgnoreCase(output.name()) || output.headers().size() != 2 || output.rows().isEmpty()) continue;
                 String name = safeSheetName(output.name(), 0);
                 org.apache.poi.xssf.usermodel.XSSFSheet sheet = workbook.getSheet(name);
                 if (sheet == null) continue;

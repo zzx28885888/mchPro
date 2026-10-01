@@ -43,6 +43,30 @@ public class TaskDataService {
         }
     }
 
+    public void markInputsInspected(Long taskId) {
+        redis.opsForValue().set(key(taskId, "workflowInspected"), "true", Duration.ofHours(2));
+    }
+
+    public boolean inputsInspected(Long taskId) {
+        return "true".equals(redis.opsForValue().get(key(taskId, "workflowInspected")));
+    }
+    public void setWorkflowResult(Long taskId, com.excelai.excel.WorkflowResult result) {
+        try {
+            redis.opsForValue().set(key(taskId, "workflowResult"), mapper.writeValueAsString(result), Duration.ofHours(2));
+        } catch (Exception e) {
+            throw new IllegalStateException("Cannot save workflow result", e);
+        }
+    }
+
+    public com.excelai.excel.WorkflowResult workflowResult(Long taskId) {
+        String json = redis.opsForValue().get(key(taskId, "workflowResult"));
+        if (json == null) return null;
+        try {
+            return mapper.readValue(json, com.excelai.excel.WorkflowResult.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("Cannot read workflow result", e);
+        }
+    }
     public void setResult(Long taskId, Long fileId) {
         redis.opsForValue().set(key(taskId, "result"), fileId.toString(), Duration.ofHours(2));
     }
@@ -53,7 +77,7 @@ public class TaskDataService {
     }
 
     public void clear(Long taskId) {
-        redis.delete(List.of(key(taskId, "rows"), key(taskId, "result")));
+        redis.delete(List.of(key(taskId, "rows"), key(taskId, "result"), key(taskId, "workflowResult"), key(taskId, "workflowInspected")));
     }
 
     private String key(Long taskId, String part) {

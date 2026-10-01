@@ -42,6 +42,16 @@ class TaskControllerTest {
         assertThrows(ApiException.class, request::resolvedFileIds);
     }
 
+    @Test
+    void taskGetReturnsStructuredPersistedWorkflowSummary() {
+        TaskService service = mock(TaskService.class);
+        var summary = "{\"workflowType\":\"SUMMARY\",\"counts\":{\"groupCount\":2},\"exceptions\":[]}";
+        when(service.get(81L, 17L)).thenReturn(new TaskRepository.Task(81L, 17L, 3L, "summary", "SUMMARY", "{}", "COMPLETED", 100, 90L, null, summary));
+        TaskController controller = new TaskController(service, new ObjectMapper());
+        Map<String, Object> response = controller.get(81L, authentication(17L));
+        assertEquals("SUMMARY", response.get("workflowType"));
+        assertEquals(2, ((Map<?, ?>) response.get("resultSummary")).get("counts") instanceof Map<?, ?> counts ? counts.get("groupCount") : null);
+    }
     private Authentication authentication(Long userId) {
         Authentication authentication = mock(Authentication.class);
         when(authentication.getPrincipal()).thenReturn(userId);

@@ -106,5 +106,5 @@ ON CONFLICT (plan_code) DO NOTHING;
 INSERT INTO plan_tool_permission(plan_code, tool_name, enabled)
 SELECT p.plan_code, t.tool_name, TRUE
 FROM plan p
-CROSS JOIN (VALUES ('read_excel'), ('filter'), ('sort'), ('top'), ('export_excel')) AS t(tool_name)
+CROSS JOIN (VALUES ('read_excel'), ('filter'), ('sort'), ('top'), ('export_excel'), ('inspect_workflow_inputs'), ('merge_clean_workbooks'), ('reconcile_workbooks'), ('summarize_workbook'), ('export_workbook_result')) AS t(tool_name)
 ON CONFLICT (plan_code, tool_name) DO NOTHING;

@@ -16,3 +16,10 @@ INSERT INTO ai_task_input(task_id, file_id, ordinal)
 SELECT id, input_file_id, 0 FROM ai_task
 WHERE input_file_id IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM ai_task_input i WHERE i.task_id=ai_task.id AND i.file_id=ai_task.input_file_id);
+-- 中文：为所有现有套餐登记第一阶段工作流工具许可，尊重管理员已有配置。
+-- English: Register phase-one workflow tools for existing plans while preserving administrator overrides.
+INSERT INTO plan_tool_permission(plan_code, tool_name, enabled)
+SELECT p.plan_code, t.tool_name, TRUE
+FROM plan p
+CROSS JOIN (VALUES ('inspect_workflow_inputs'), ('merge_clean_workbooks'), ('reconcile_workbooks'), ('summarize_workbook'), ('export_workbook_result')) AS t(tool_name)
+ON CONFLICT (plan_code, tool_name) DO NOTHING;
