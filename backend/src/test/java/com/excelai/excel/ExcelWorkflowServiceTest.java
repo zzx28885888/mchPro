@@ -54,4 +54,35 @@ class ExcelWorkflowServiceTest {    private static Map<String, List<String>> ord
         assertTrue(result.exceptions().stream().anyMatch(e -> e.code().equals("INVALID_DATE")));
         assertTrue(result.exceptions().stream().anyMatch(e -> e.code().equals("INVALID_AMOUNT")));
     }
-}
+    @Test
+    void reconciliationReportsBlankAndDuplicateKeys() {
+        var left = new SheetInput(20L, "L", List.of("ID", "Amount"), List.of(List.of("A", "10"), List.of("A", "11"), List.of("", "12")));
+        var right = new SheetInput(21L, "R", List.of("Ref", "Value"), List.of(List.of("A", "10")));
+        var options = reconcileOptions("ID", "Ref", "Amount", "Value", "0");
+        WorkflowResult result = new ExcelWorkflowService().reconcile(left, right, options);
+        assertEquals(4, result.outputSheets().stream().filter(s -> s.name().equals("AMBIGUOUS_KEY")).findFirst().orElseThrow().rows().size());
+        assertEquals(0, result.outputSheets().stream().filter(s -> s.name().equals("MATCHED")).findFirst().orElseThrow().rows().size());
+    }
+
+    @Test
+    void reconciliationAppliesInclusiveToleranceAndReportsInvalidNumbers() {
+        var left = new SheetInput(20L, "L", List.of("ID", "Amount"), List.of(List.of("A", "10.00"), List.of("B", "oops")));
+        var right = new SheetInput(21L, "R", List.of("Ref", "Value"), List.of(List.of("A", "10.05"), List.of("B", "8.00")));
+        var options = reconcileOptions("ID", "Ref", "Amount", "Value", "0.05");
+        WorkflowResult result = new ExcelWorkflowService().reconcile(left, right, options);
+        assertEquals(1, result.outputSheets().stream().filter(s -> s.name().equals("MATCHED")).findFirst().orElseThrow().rows().size());
+        assertEquals(1, result.exceptions().stream().filter(e -> e.code().equals("INVALID_NUMBER")).count());
+    }
+
+    @Test
+    void reconciliationPreservesUnmatchedRows() {
+        var left = new SheetInput(20L, "L", List.of("ID", "Amount"), List.of(List.of("A", "10"), List.of("B", "20")));
+        var right = new SheetInput(21L, "R", List.of("Ref", "Value"), List.of(List.of("C", "30")));
+        WorkflowResult result = new ExcelWorkflowService().reconcile(left, right, reconcileOptions("ID", "Ref", "Amount", "Value", "0"));
+        assertEquals(2, result.outputSheets().stream().filter(s -> s.name().equals("LEFT_ONLY")).findFirst().orElseThrow().rows().size());
+        assertEquals(1, result.outputSheets().stream().filter(s -> s.name().equals("RIGHT_ONLY")).findFirst().orElseThrow().rows().size());
+    }
+
+    private static ReconcileOptions reconcileOptions(String leftKey, String rightKey, String leftValue, String rightValue, String tolerance) {
+        return new ReconcileOptions(Map.of("id", leftKey), Map.of("id", rightKey), Map.of("amount", leftValue), Map.of("amount", rightValue), new java.math.BigDecimal(tolerance));
+    }}
