@@ -48,7 +48,7 @@
     .tab { flex: 1; padding: 9px; color: var(--muted); background: transparent; border: 0; border-radius: 7px; font-size: 13px; font-weight: 650; }
     .tab.active { color: var(--ink); background: white; box-shadow: 0 1px 4px rgb(31 48 42 / 10%); }
     label { display: block; margin-bottom: 7px; color: #40534a; font-size: 12px; font-weight: 700; }
-    input[type="email"], input[type="password"], textarea { width: 100%; padding: 12px 13px; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 10px; outline: none; transition: border-color .15s, box-shadow .15s; }
+    input[type="email"], input[type="password"], input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 12px 13px; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 10px; outline: none; transition: border-color .15s, box-shadow .15s; }
     input:focus, textarea:focus { border-color: #78aa8e; box-shadow: 0 0 0 3px rgb(25 107 74 / 10%); }
     .field { margin-bottom: 15px; }
     .primary, .secondary { min-height: 43px; padding: 11px 15px; border-radius: 10px; font-size: 13px; font-weight: 700; transition: background .15s, transform .15s; }
@@ -75,6 +75,17 @@
     .upload-copy span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
     .file-input { max-width: 220px; color: var(--muted); font-size: 11px; }
     textarea { min-height: 112px; resize: vertical; line-height: 1.55; }
+    .workflow-options { display: grid; gap: 15px; margin-top: 18px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #fbfdfb; }
+    .workflow-options h3 { margin: 0; font-size: 15px; }
+    .workflow-option-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .workflow-option { min-width: 0; }
+    .workflow-option input, .workflow-option select { width: 100%; min-height: 39px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; background: white; }
+    .workflow-option select[multiple] { min-height: 92px; }
+    .workflow-option small, .workflow-help { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .workflow-preview { margin-top: 14px; padding: 13px; background: var(--wash); border-radius: 10px; }
+    .workflow-preview pre, .summary-content { max-height: 260px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.55 Consolas, monospace; }
+    .source-map-row { display: grid; grid-template-columns: minmax(100px, 1fr) 22px minmax(100px, 1fr); align-items: center; gap: 8px; }
+    .check-option { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 12px; }
     .submit-row { display: flex; align-items: center; gap: 12px; margin-top: 17px; }
     .submit-row .primary { min-width: 148px; }
     .privacy-note { color: var(--muted); font-size: 11px; line-height: 1.5; }
@@ -100,6 +111,7 @@
       .side-card { order: 2; }
       .card { padding: 20px; }
       .file-input { max-width: 150px; }
+      .workflow-option-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 440px) {
       .shell { width: min(100% - 24px, 1080px); }
@@ -124,7 +136,7 @@
       <section class="intro">
         <p class="eyebrow">WORK WITH YOUR SPREADSHEETS</p>
         <h1>让表格处理<br>变得简单一点。</h1>
-        <p>上传 Excel，用一句话描述你想完成的整理、筛选或排序。任务完成后，可以直接下载结果。</p>
+        <p>用自然语言处理表格，或选择合并清洗、两表对账、销售汇总工作流。执行前先查看文件与规则预览，再确认运行并下载新结果。</p>
       </section>
 
       <div class="layout">
@@ -155,26 +167,49 @@
             <button class="secondary" id="logoutButton" type="button">退出登录</button>
           </div>
           <h2 id="workTitle">处理一个表格</h2>
-          <p class="card-sub">选择 Excel 文件，再写下你希望 AI 完成的操作。</p>
+          <p class="card-sub">选择 Excel 文件和业务工作流 / Choose workbooks and a business workflow.</p>
           <form id="taskForm">
+            <div class="field">
+              <label for="workflowType">处理模式 / Workflow</label>
+              <select id="workflowType" name="workflowType">
+                <option value="FREEFORM">自由处理 / Freeform</option>
+                <option value="MERGE_CLEAN">合并与清洗 / Merge &amp; clean</option>
+                <option value="RECONCILE">两表对账 / Reconcile workbooks</option>
+                <option value="SUMMARY">销售与运营汇总 / Sales &amp; operations summary</option>
+              </select>
+            </div>
             <div class="upload-box">
               <div class="upload-icon" aria-hidden="true">↥</div>
-              <div class="upload-copy"><strong id="fileName">还没有选择文件</strong><span>支持 .xlsx 和 .xls</span></div>
-              <input class="file-input" id="fileInput" type="file" accept=".xlsx,.xls" required aria-label="选择 Excel 文件">
+              <div class="upload-copy"><strong id="fileName">还没有选择文件</strong><span>支持 .xlsx 和 .xls · 工作流按场景选择 1 或多份 / Select 1+ files for the chosen workflow</span></div>
+              <input class="file-input" id="fileInput" type="file" accept=".xlsx,.xls" required multiple aria-label="选择 Excel 文件">
+            </div>
+            <div id="workflowOptionsPanel" class="workflow-options" hidden>
+              <h3>工作流选项 / Workflow options</h3>
+              <p class="workflow-help" id="workflowHelp">先选择工作表并填写映射 / Select worksheets and provide explicit mappings.</p>
+              <div id="workflowConfig" class="workflow-option-grid"></div>
+              <div id="workflowSourceMap" class="workflow-option-grid"></div>
             </div>
             <div class="field" style="margin-top:20px">
               <label for="prompt">你想怎么处理？</label>
               <textarea id="prompt" name="prompt" required placeholder="例如：找出销售额最高的 10 条记录，并按销售额从高到低排列。"></textarea>
             </div>
             <div class="submit-row">
-              <button class="primary" id="taskSubmit" type="submit">上传并开始处理</button>
+              <button class="primary" id="taskSubmit" type="submit">上传并开始处理 / Upload &amp; run</button>
+              <button class="primary" id="inspectWorkflowButton" type="button" hidden>上传并读取文件信息 / Upload &amp; inspect</button>
+              <button class="secondary" id="previewWorkflowButton" type="button" hidden disabled>生成执行预览 / Build run preview</button>
               <span class="privacy-note">开始后请保持此页面打开，完成时会显示下载按钮。</span>
             </div>
           </form>
           <div class="message" id="taskMessage" role="status" aria-live="polite"></div>
+          <div class="workflow-preview" id="workflowReview" hidden>
+            <strong>执行前预览 / Review before run</strong>
+            <pre id="workflowReviewContent"></pre>
+            <button class="primary wide" id="confirmWorkflowButton" type="button" hidden>确认并运行 / Confirm &amp; run</button>
+          </div>
           <div class="result" id="resultPanel" aria-live="polite">
             <div class="result-top"><strong id="resultTitle">任务状态</strong><span id="resultProgress"></span></div>
             <div class="result-error" id="resultError" hidden></div>
+            <details id="resultSummaryPanel" hidden><summary>处理摘要与异常 / Summary &amp; exceptions</summary><pre class="summary-content" id="resultSummary"></pre></details>
             <button class="secondary" id="downloadButton" type="button" hidden>下载处理结果</button>
           </div>
         </section>
@@ -204,9 +239,14 @@
       const authMessage = $('authMessage');
       const taskMessage = $('taskMessage');
       const resultPanel = $('resultPanel');
+      const workflowSelect = $('workflowType');
       let mode = 'login';
       let token = sessionStorage.getItem('excel-ai-token') || '';
       let resultFileId = 0;
+      let workflowFileIds = [];
+      let workflowInputPreview = null;
+      let workflowFingerprint = '';
+      let reviewedWorkflowRequest = null;
       $('apiOrigin').textContent = window.location.origin;
 
       function showMessage(element, message, type = 'info') {
@@ -254,13 +294,285 @@
         authCard.classList.remove('hide');
         setMode('login');
       }
+      function isTypedWorkflow() { return workflowSelect.value !== 'FREEFORM'; }
+      function clearReview() {
+        workflowFingerprint = '';
+        reviewedWorkflowRequest = null;
+        $('workflowReview').hidden = true;
+        $('confirmWorkflowButton').hidden = true;
+      }
+      function invalidateWorkflow(resetInputs = false) {
+        clearReview();
+        if (resetInputs) {
+          workflowFileIds = [];
+          workflowInputPreview = null;
+          $('workflowOptionsPanel').hidden = true;
+          $('previewWorkflowButton').hidden = true;
+          $('inspectWorkflowButton').hidden = !isTypedWorkflow();
+        }
+      }
+      function updateWorkflowMode() {
+        const typed = isTypedWorkflow();
+        $('fileInput').multiple = typed;
+        $('prompt').required = !typed;
+        $('taskSubmit').hidden = typed;
+        $('inspectWorkflowButton').hidden = !typed;
+        $('previewWorkflowButton').hidden = true;
+        $('workflowOptionsPanel').hidden = true;
+        $('workflowReview').hidden = true;
+        $('confirmWorkflowButton').hidden = true;
+        $('workflowHelp').textContent = typed
+          ? '先读取文件结构，再填写明确字段映射和规则。 / Inspect sheets first, then provide explicit mappings and rules.'
+          : '自由处理继续支持原有单文件流程。 / Freeform keeps the original single-file flow.';
+        invalidateWorkflow(true);
+        $('fileName').textContent = selectedFiles().map((file) => file.name).join('、') || '还没有选择文件';
+      }
+      function selectedFiles() { return Array.from($('fileInput').files || []); }
+      function validateFileCount(files) {
+        const type = workflowSelect.value;
+        const valid = type === 'MERGE_CLEAN' ? files.length >= 2 && files.length <= 5
+          : type === 'RECONCILE' ? files.length === 2
+          : type === 'SUMMARY' ? files.length === 1
+          : files.length === 1;
+        if (!valid) {
+          const expected = type === 'MERGE_CLEAN' ? '合并清洗请选择 2–5 个文件。 / Choose 2–5 files for merge & clean.'
+            : type === 'RECONCILE' ? '对账必须选择 2 个文件。 / Reconciliation requires exactly 2 files.'
+            : '此工作流必须选择 1 个文件。 / This workflow requires exactly 1 file.';
+          throw new Error(expected);
+        }
+      }
+      function field(container, id, labelText, type = 'text', value = '') {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'workflow-option';
+        const label = document.createElement('label');
+        label.htmlFor = id;
+        label.textContent = labelText;
+        const input = document.createElement('input');
+        input.id = id;
+        input.type = type;
+        input.value = value;
+        wrapper.append(label, input);
+        container.append(wrapper);
+        return input;
+      }
+      function selectField(container, id, labelText, values, multiple = false, allowBlank = false) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'workflow-option';
+        const label = document.createElement('label');
+        label.htmlFor = id;
+        label.textContent = labelText;
+        const select = document.createElement('select');
+        select.id = id;
+        select.multiple = multiple;
+        if (allowBlank && !multiple) {
+          const empty = document.createElement('option');
+          empty.value = '';
+          empty.textContent = '不选择 / None';
+          select.append(empty);
+        }
+        for (const value of values) {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = value || '(空表头 / Blank header)';
+          select.append(option);
+        }
+        wrapper.append(label, select);
+        container.append(wrapper);
+        return select;
+      }
+      function chosenValues(id) { return Array.from($(id).selectedOptions).map((option) => option.value).filter(Boolean); }
+      function selectedSheetNames() {
+        const inputs = workflowInputPreview?.inputFiles || [];
+        return inputs.map((_, index) => $(`sheet-${index}`)?.value || '');
+      }
+      function getSelectedSchemas() {
+        if (!workflowInputPreview) throw new Error('请先读取输入文件。 / Inspect the input files first.');
+        const names = selectedSheetNames();
+        if (names.some((name) => !name)) throw new Error('请为每个文件明确选择工作表。 / Select one worksheet for every input file.');
+        return workflowInputPreview.inputFiles.map((file, index) => {
+          const sheet = file.sheets.find((item) => item.name === names[index]);
+          if (!sheet) throw new Error(`找不到工作表：${names[index]}`);
+          return sheet;
+        });
+      }
+      function renderWorkflowOptions(preview) {
+        workflowInputPreview = preview;
+        $('workflowConfig').replaceChildren();
+        $('workflowSourceMap').replaceChildren();
+        const files = preview.inputFiles || [];
+        files.forEach((file, index) => {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'workflow-option';
+          const label = document.createElement('label');
+          label.htmlFor = `sheet-${index}`;
+          label.textContent = `${file.name} · 工作表 / worksheet`;
+          const select = document.createElement('select');
+          select.id = `sheet-${index}`;
+          if (file.sheets.length !== 1) {
+            const blank = document.createElement('option');
+            blank.value = '';
+            blank.textContent = '请选择工作表 / Select a worksheet';
+            select.append(blank);
+          }
+          for (const sheet of file.sheets) {
+            const option = document.createElement('option');
+            option.value = sheet.name;
+            option.textContent = `${sheet.name} · ${sheet.headers.join(' | ')}`;
+            select.append(option);
+          }
+          wrapper.append(label, select);
+          $('workflowConfig').append(wrapper);
+          select.addEventListener('change', () => { clearReview(); renderOperationFields(); });
+        });
+        renderOperationFields();
+      }
+      function renderOperationFields() {
+        $('workflowSourceMap').replaceChildren();
+        const config = $('workflowConfig');
+        // 中文：按完整字段容器清理旧控件，避免切换工作表后留下空容器。
+        // English: Remove each full field wrapper to avoid empty containers after worksheet changes.
+        for (const old of Array.from(config.querySelectorAll('[data-operation-field="true"]'))) old.closest('.workflow-option')?.remove();
+        let schemas;
+        try { schemas = getSelectedSchemas(); }
+        catch { $('workflowHelp').textContent = '先明确选择所有工作表。 / Select every worksheet first.'; return; }
+        const type = workflowSelect.value;
+        if (type === 'MERGE_CLEAN') {
+          $('workflowHelp').textContent = '将同义来源表头映射到同一个输出字段；重复/空表头仍会作为冲突报告。 / Map equivalent source headers to one output field; duplicate or blank headers remain visible as conflicts.';
+          const headers = [...new Set(schemas.flatMap((sheet) => sheet.headers).filter((header) => header.trim()))];
+          if (!headers.length) throw new Error('没有可映射的非空表头。 / No nonblank headers are available to map.');
+          headers.forEach((header, index) => {
+            const row = document.createElement('div');
+            row.className = 'source-map-row workflow-option';
+            const source = document.createElement('span');
+            source.textContent = header;
+            const arrow = document.createElement('span');
+            arrow.textContent = '→';
+            const target = document.createElement('input');
+            target.type = 'text';
+            target.id = `merge-map-${index}`;
+            target.value = header;
+            target.dataset.sourceHeader = header;
+            target.setAttribute('aria-label', `${header} 的输出字段 / output field for ${header}`);
+            row.append(source, arrow, target);
+            $('workflowSourceMap').append(row);
+          });
+          const targets = [...new Set(headers)];
+          const keys = selectField(config, 'merge-keys', '去重键 / Duplicate keys', targets, true);
+          keys.dataset.operationField = 'true';
+          const amount = selectField(config, 'merge-amounts', '金额列 / Amount columns', targets, true);
+          amount.dataset.operationField = 'true';
+          const date = selectField(config, 'merge-date', '日期列 / Date column', targets, false, true);
+          date.dataset.operationField = 'true';
+          const dateFormat = field(config, 'merge-date-format', '日期格式 / Date format', 'text', 'yyyy-MM-dd');
+          dateFormat.dataset.operationField = 'true';
+          const checkboxWrap = document.createElement('label');
+          checkboxWrap.className = 'workflow-option check-option';
+          const checkbox = document.createElement('input');
+          checkbox.id = 'merge-skip-blank';
+          checkbox.type = 'checkbox';
+          checkbox.checked = true;
+          checkbox.dataset.operationField = 'true';
+          checkboxWrap.append(checkbox, document.createTextNode('跳过空行 / Skip blank rows'));
+          config.append(checkboxWrap);
+        } else if (type === 'RECONCILE') {
+          $('workflowHelp').textContent = '选择一到三个键字段对，可选一到三个数值字段对；容差含边界。 / Choose 1–3 key pairs and optional numeric value pairs; tolerance is inclusive.';
+          const left = schemas[0].headers.filter((header) => header.trim());
+          const right = schemas[1].headers.filter((header) => header.trim());
+          for (let index = 0; index < 3; index += 1) {
+            const l = selectField(config, `reconcile-left-key-${index}`, `${index ? '附加' : '必需'}左键 ${index + 1} / Left key ${index + 1}`, left, false, index > 0);
+            const r = selectField(config, `reconcile-right-key-${index}`, `${index ? '附加' : '必需'}右键 ${index + 1} / Right key ${index + 1}`, right, false, index > 0);
+            l.dataset.operationField = 'true'; r.dataset.operationField = 'true';
+          }
+          for (let index = 0; index < 3; index += 1) {
+            const l = selectField(config, `reconcile-left-value-${index}`, `左数值 ${index + 1} / Left value ${index + 1}`, left, false, true);
+            const r = selectField(config, `reconcile-right-value-${index}`, `右数值 ${index + 1} / Right value ${index + 1}`, right, false, true);
+            l.dataset.operationField = 'true'; r.dataset.operationField = 'true';
+          }
+          const tolerance = field(config, 'reconcile-tolerance', '数值容差 / Numeric tolerance', 'number', '0');
+          tolerance.min = '0'; tolerance.step = 'any'; tolerance.dataset.operationField = 'true';
+        } else if (type === 'SUMMARY') {
+          $('workflowHelp').textContent = '选择统计指标、分类维度和可选日期周期；SUM 使用金额，COUNT 统计行数。 / Choose a measure, dimensions, and optional date period.';
+          const headers = schemas[0].headers.filter((header) => header.trim());
+          selectField(config, 'summary-measure', '统计字段 / Measure', headers).dataset.operationField = 'true';
+          selectField(config, 'summary-dimensions', '分类维度 / Dimensions', headers, true).dataset.operationField = 'true';
+          selectField(config, 'summary-aggregation', '聚合方式 / Aggregation', ['SUM', 'COUNT']).dataset.operationField = 'true';
+          selectField(config, 'summary-date-column', '日期列 / Date column', headers, false, true).dataset.operationField = 'true';
+          selectField(config, 'summary-date-period', '日期周期 / Date period', ['DAY', 'MONTH', 'QUARTER', 'YEAR'], false, true).dataset.operationField = 'true';
+          field(config, 'summary-date-format', '日期格式 / Date format', 'text', 'yyyy-MM-dd').dataset.operationField = 'true';
+        }
+      }
+      function buildWorkflowOptions() {
+        const sheets = selectedSheetNames();
+        if (sheets.some((name) => !name)) throw new Error('请为每个文件选择工作表。 / Select a worksheet for every file.');
+        const schemas = getSelectedSchemas();
+        if (workflowSelect.value === 'MERGE_CLEAN') {
+          const aliases = {};
+          for (const input of Array.from($('workflowSourceMap').querySelectorAll('input[data-source-header]'))) {
+            const source = input.dataset.sourceHeader;
+            const target = input.value.trim();
+            if (!target) throw new Error(`请为表头“${source}”填写输出字段。 / Set an output field for ${source}.`);
+            aliases[target] ||= [];
+            if (!aliases[target].includes(source)) aliases[target].push(source);
+          }
+          const dateColumn = $('merge-date').value;
+          return { sheetNames: sheets, headerAliases: aliases, duplicateKeyColumns: chosenValues('merge-keys'), skipBlankRows: $('merge-skip-blank').checked,
+            dateFormats: dateColumn ? { [dateColumn]: $('merge-date-format').value.trim() || 'yyyy-MM-dd' } : {}, amountColumns: chosenValues('merge-amounts') };
+        }
+        if (workflowSelect.value === 'RECONCILE') {
+          const leftKeys = {}, rightKeys = {}, leftValues = {}, rightValues = {};
+          for (let index = 0; index < 3; index += 1) {
+            const left = $(`reconcile-left-key-${index}`).value;
+            const right = $(`reconcile-right-key-${index}`).value;
+            if (index === 0 && (!left || !right)) throw new Error('请选择左右匹配键。 / Choose a matching key on both sides.');
+            if (Boolean(left) !== Boolean(right)) throw new Error('键字段必须左右成对选择。 / Choose key columns in left/right pairs.');
+            if (left && right) { leftKeys[`key${index + 1}`] = left; rightKeys[`key${index + 1}`] = right; }
+            const leftValue = $(`reconcile-left-value-${index}`).value;
+            const rightValue = $(`reconcile-right-value-${index}`).value;
+            if (Boolean(leftValue) !== Boolean(rightValue)) throw new Error('数值字段必须左右成对选择。 / Choose value columns in left/right pairs.');
+            if (leftValue && rightValue) { leftValues[`value${index + 1}`] = leftValue; rightValues[`value${index + 1}`] = rightValue; }
+          }
+          return { leftSheetName: sheets[0], rightSheetName: sheets[1], leftKeyMappings: leftKeys, rightKeyMappings: rightKeys,
+            leftValueMappings: leftValues, rightValueMappings: rightValues, tolerance: $('reconcile-tolerance').value || '0' };
+        }
+        const measureColumn = $('summary-measure').value;
+        if (!measureColumn) throw new Error('请选择统计字段。 / Select a measure column.');
+        const dateColumn = $('summary-date-column').value;
+        const datePeriod = $('summary-date-period').value;
+        if (Boolean(dateColumn) !== Boolean(datePeriod)) throw new Error('日期列和日期周期必须同时设置。 / Set both date column and period, or neither.');
+        return { sheetName: sheets[0], measureColumn, dimensionColumns: chosenValues('summary-dimensions'), aggregation: $('summary-aggregation').value,
+          dateColumn: dateColumn || null, datePeriod: datePeriod || null, dateFormat: $('summary-date-format').value.trim() || 'yyyy-MM-dd' };
+      }
+      function setMode(nextMode) {
+        mode = nextMode;
+        const isLogin = mode === 'login';
+        $('loginTab').classList.toggle('active', isLogin);
+        $('registerTab').classList.toggle('active', !isLogin);
+        $('loginTab').setAttribute('aria-selected', String(isLogin));
+        $('registerTab').setAttribute('aria-selected', String(!isLogin));
+        $('authTitle').textContent = isLogin ? '开始使用' : '创建账号';
+        $('authSubmit').textContent = isLogin ? '登录' : '创建账号并登录';
+        $('password').autocomplete = isLogin ? 'current-password' : 'new-password';
+        clearMessage(authMessage);
+      }
+      function showWorkspace() { authCard.classList.add('hide'); workspace.classList.add('show'); }
+      function signOut() {
+        token = '';
+        sessionStorage.removeItem('excel-ai-token');
+        workspace.classList.remove('show');
+        authCard.classList.remove('hide');
+        setMode('login');
+      }
 
       $('loginTab').addEventListener('click', () => setMode('login'));
       $('registerTab').addEventListener('click', () => setMode('register'));
       $('logoutButton').addEventListener('click', signOut);
+      workflowSelect.addEventListener('change', updateWorkflowMode);
       $('fileInput').addEventListener('change', () => {
-        $('fileName').textContent = $('fileInput').files[0]?.name || '还没有选择文件';
+        const files = selectedFiles();
+        $('fileName').textContent = files.map((file) => file.name).join('、') || '还没有选择文件';
+        invalidateWorkflow(true);
       });
+      $('prompt').addEventListener('input', clearReview);
 
       $('authForm').addEventListener('submit', async (event) => {
         // 中文：注册操作随后复用登录接口签发 JWT，因此用户注册完成后直接进入工作区。
@@ -278,10 +590,61 @@
           showWorkspace();
         } catch (error) {
           showMessage(authMessage, error.message || '操作失败，请稍后重试。', 'error');
-        } finally {
-          submit.disabled = false;
-        }
+        } finally { submit.disabled = false; }
       });
+
+      async function uploadSelectedWorkflowFiles() {
+        const files = selectedFiles();
+        validateFileCount(files);
+        const ids = [];
+        for (const file of files) {
+          const form = new FormData();
+          form.append('file', file);
+          const uploaded = await request('/api/files/upload', { method: 'POST', body: form });
+          ids.push(uploaded.fileId);
+        }
+        return ids;
+      }
+      $('inspectWorkflowButton').addEventListener('click', async () => {
+        const button = $('inspectWorkflowButton');
+        button.disabled = true;
+        clearMessage(taskMessage);
+        try {
+          workflowFileIds = await uploadSelectedWorkflowFiles();
+          const preview = await request('/api/tasks/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileIds: workflowFileIds, workflowType: workflowSelect.value, options: {}, prompt: $('prompt').value.trim() }) });
+          clearReview();
+          $('workflowOptionsPanel').hidden = false;
+          renderWorkflowOptions(preview);
+          $('inspectWorkflowButton').hidden = true;
+          $('previewWorkflowButton').hidden = false;
+          showMessage(taskMessage, `已读取 ${preview.inputFiles.length} 个文件，请检查工作表并填写选项。 / Inspected ${preview.inputFiles.length} files; select sheets and configure options.`);
+        } catch (error) {
+          workflowFileIds = [];
+          showMessage(taskMessage, error.message || '读取文件失败。', 'error');
+        } finally { button.disabled = false; }
+      });
+      $('previewWorkflowButton').addEventListener('click', async () => {
+        const button = $('previewWorkflowButton');
+        button.disabled = true;
+        try {
+          const payload = { fileIds: workflowFileIds, workflowType: workflowSelect.value, options: buildWorkflowOptions(), prompt: $('prompt').value.trim() };
+          const preview = await request('/api/tasks/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          workflowFingerprint = preview.previewFingerprint;
+          reviewedWorkflowRequest = payload;
+          $('workflowReviewContent').textContent = JSON.stringify({ workflowType: preview.workflowType, files: preview.inputFiles.map((file) => ({ name: file.name, sheets: file.sheets.map((sheet) => sheet.name) })), operationSummary: preview.operationSummary }, null, 2);
+          $('workflowReview').hidden = false;
+          $('confirmWorkflowButton').hidden = false;
+          showMessage(taskMessage, '请核对文件、工作表和规则；确认后任务开始运行。 / Review files, sheets, and rules; confirm to start.');
+        } catch (error) {
+          clearReview();
+          showMessage(taskMessage, error.message || '预览失败，请检查字段和规则。', 'error');
+        } finally { button.disabled = false; }
+      });
+      // 中文：统一在面板级监听配置变更，避免每次重绘都重复注册监听器。
+      // English: Handle option changes once at the panel level instead of adding listeners on every render.
+      $('workflowOptionsPanel').addEventListener('input', clearReview);
+      $('workflowOptionsPanel').addEventListener('change', clearReview);
 
       async function downloadResult() {
         const response = await fetch(`/api/files/${resultFileId}/download`, { headers: { Authorization: `Bearer ${token}` } });
@@ -302,7 +665,15 @@
         try { await downloadResult(); }
         catch (error) { showMessage(taskMessage, error.message || '下载失败。', 'error'); }
       });
-
+      function renderResultSummary(task) {
+        const summary = task.resultSummary || {};
+        if (!Object.keys(summary).length) return;
+        $('resultSummaryPanel').hidden = false;
+        const exceptions = Array.isArray(summary.exceptions) ? summary.exceptions : [];
+        const display = { workflowType: summary.workflowType || task.workflowType, operationDefinition: summary.operationDefinition || {}, counts: summary.counts || {}, warnings: summary.warnings || [], exceptionCount: exceptions.length, exceptions: exceptions.slice(0, 100) };
+        if (exceptions.length > 100) display.omittedExceptionRows = exceptions.length - 100;
+        $('resultSummary').textContent = JSON.stringify(display, null, 2);
+      }
       async function watchTask(taskId) {
         // 中文：每 2 秒轮询一次，最多等待约 6 分钟；任务结果由后端按当前用户权限返回。
         // English: Poll every two seconds for up to about six minutes; the backend scopes task results to the authenticated user.
@@ -314,28 +685,57 @@
           if (task.status === 'COMPLETED') {
             resultFileId = task.resultFileId;
             $('downloadButton').hidden = !resultFileId;
-            showMessage(taskMessage, '处理完成，可以下载结果文件。');
+            renderResultSummary(task);
+            showMessage(taskMessage, '处理完成，可以下载结果文件。 / Complete; download the result workbook.');
             return;
           }
           if (task.status === 'FAILED') {
             $('resultError').textContent = task.error || '任务处理失败。';
             $('resultError').hidden = false;
-            showMessage(taskMessage, '任务没有完成，请检查提示后重试。', 'error');
+            renderResultSummary(task);
+            showMessage(taskMessage, '任务没有完成，请检查提示后重试。 / The task failed; review the error and try again.', 'error');
             return;
           }
         }
-        showMessage(taskMessage, '任务仍在处理中；你可以稍后刷新任务状态。', 'info');
+        showMessage(taskMessage, '任务仍在处理中；你可以稍后刷新任务状态。 / The task is still running; check its status later.');
       }
 
+      $('confirmWorkflowButton').addEventListener('click', async () => {
+        if (!workflowFingerprint || !reviewedWorkflowRequest) return;
+        const button = $('confirmWorkflowButton');
+        button.disabled = true;
+        resultPanel.classList.add('show');
+        $('resultSummaryPanel').hidden = true;
+        $('downloadButton').hidden = true;
+        $('resultError').hidden = true;
+        $('resultTitle').textContent = '正在创建已确认的工作流任务…';
+        $('resultProgress').textContent = '';
+        try {
+          const created = await request('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...reviewedWorkflowRequest, previewFingerprint: workflowFingerprint }) });
+          clearReview();
+          showMessage(taskMessage, '任务已提交，页面会自动更新状态。 / Submitted; progress will update automatically.');
+          $('resultTitle').textContent = `任务 #${created.taskId} · ${created.status}`;
+          $('resultProgress').textContent = '0%';
+          await watchTask(created.taskId);
+        } catch (error) {
+          showMessage(taskMessage, error.message || '确认失败；请重新生成预览。', 'error');
+          $('resultTitle').textContent = '任务未完成';
+          clearReview();
+        } finally { button.disabled = false; }
+      });
+
       $('taskForm').addEventListener('submit', async (event) => {
-        // 中文：上传与建任务是两个 API 步骤：先拿 fileId，再把 fileId 和自然语言要求提交给任务 API。
-        // English: Upload and task creation are separate API calls: obtain a fileId first, then submit it with the natural-language request.
+        // 中文：自由处理保留旧版单文件 fileId/prompt 请求；结构化工作流走预览确认接口。
+        // English: Freeform retains the legacy single-file fileId/prompt request; typed workflows use preview and confirmation.
         event.preventDefault();
-        const file = $('fileInput').files[0];
+        if (isTypedWorkflow()) return;
+        const file = selectedFiles()[0];
         if (!file) return;
         const submit = $('taskSubmit');
         submit.disabled = true;
         $('downloadButton').hidden = true;
+        $('resultSummaryPanel').hidden = true;
         $('resultError').hidden = true;
         resultPanel.classList.add('show');
         $('resultTitle').textContent = '正在上传文件…';
@@ -346,10 +746,8 @@
           form.append('file', file);
           const uploaded = await request('/api/files/upload', { method: 'POST', body: form });
           $('resultTitle').textContent = '文件已上传，正在创建任务…';
-          const created = await request('/api/tasks', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileId: uploaded.fileId, prompt: $('prompt').value.trim() })
-          });
+          const created = await request('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileId: uploaded.fileId, prompt: $('prompt').value.trim() }) });
           $('resultTitle').textContent = `任务 #${created.taskId} · ${created.status}`;
           $('resultProgress').textContent = '0%';
           showMessage(taskMessage, '任务已提交，页面会自动更新状态。');
@@ -357,11 +755,10 @@
         } catch (error) {
           showMessage(taskMessage, error.message || '请求失败，请确认服务正常运行后重试。', 'error');
           $('resultTitle').textContent = '任务未完成';
-        } finally {
-          submit.disabled = false;
-        }
+        } finally { submit.disabled = false; }
       });
 
+      updateWorkflowMode();
       if (token) showWorkspace();
     })();
   </script>

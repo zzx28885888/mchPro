@@ -14,7 +14,7 @@ This guide describes the current `low-cost-ai-agent-v1.6` codebase. Follow the r
   -> Python FastAPI 接收任务 / receives task
   -> LangGraph 调用 LLM 并选择工具 / invokes the LLM and chooses tools
   -> Java Tool Registry 校验权限并执行 / validates permissions and executes
-  -> ExcelAgentTools 生成结果文件 / creates the result workbook
+  -> ExcelAgentTools 或 ExcelWorkflowTools 生成结果 / creates the result via legacy or workflow tools
   -> Spring Worker 完成任务，页面下载 / completes task; UI downloads the result
 ```
 
@@ -31,7 +31,7 @@ The browser never receives the internal Agent token and never calls the LLM or J
 5. `agent-service/app.py` and `agent-service/agent_graph.py` — FastAPI request handling and the LangGraph model/tool loop.
 6. `agent-service/java_langgraph_tools.py` and `java_tool_client.py` — the model-facing schemas and HTTP proxy to Java.
 7. `backend/src/main/java/com/example/agent/tool/controller/AgentToolController.java` and `ToolExecutionService.java` — service authentication, authorization, parameter validation, timeout, and audit.
-8. `backend/src/main/java/com/excelai/excel/ExcelAgentTools.java` and `ExcelService.java` — the actual workbook operations.
+8. `backend/src/main/java/com/excelai/excel/ExcelAgentTools.java`, `ExcelWorkflowTools.java`, and `ExcelService.java` — legacy and typed workbook operations.
 
 建议按顺序阅读：先从页面的任务提交处理器开始，再跟随 Controller、Service、异步 Worker、LangGraph 和 Java 工具实现，最后看工具校验与数据访问层。
 
@@ -93,6 +93,16 @@ PostgreSQL 保存可持久恢复的业务记录；Redis 保存任务进度和处
 
 ## 8. 教学示例与真实链路 / Demo code versus product path
 
-`backend/.../DemoAgentTools.java`, `agent-service/tools/business_tools.py`, and `agent-service/tools/registry.py` are retained V1/demo examples. They return fake data or demonstrate a small local registry. The merged Excel SaaS path uses `ExcelAgentTools.java` through the Java registry and LangGraph proxy; it does not use the legacy Python registry.
+`backend/.../DemoAgentTools.java`, `agent-service/tools/business_tools.py`, and `agent-service/tools/registry.py` are retained V1/demo examples. They return fake data or demonstrate a small local registry. The Excel SaaS path uses `ExcelAgentTools.java` for legacy actions and `ExcelWorkflowTools.java` for typed workflows through the Java registry and LangGraph proxy; it does not use the legacy Python registry.
 
-`DemoAgentTools.java`、`business_tools.py` 和 `tools/registry.py` 是保留的 V1 演示代码；真实 Excel SaaS 请求使用 Java `ExcelAgentTools`，经 LangGraph 代理到 Java 注册表，不走旧 Python 注册表。
+`DemoAgentTools.java`、`business_tools.py` 和 `tools/registry.py` 是保留的 V1 演示代码；Excel SaaS 请求使用 Java `ExcelAgentTools` 处理旧操作、`ExcelWorkflowTools` 处理结构化工作流，经 LangGraph 代理到 Java 注册表，不走旧 Python 注册表。
+
+## 9. 业务工作流 / Typed business workflows
+
+页面提供合并清洗（2–5 个文件）、对账（2 个文件）和汇总（1 个文件）。结构化任务先上传并读取工作簿结构，再由用户选择工作表、字段映射与规则；预览返回短期指纹，创建任务时必须提交同一组文件、选项和指纹。`TaskService` 负责验证文件归属、套餐权限和预览一致性。
+
+The UI offers merge/clean (2–5 files), reconciliation (2 files), and summary (1 file). A structured task uploads files, inspects workbook structure, and asks the user to select sheets, mappings, and rules. Preview returns a short-lived fingerprint; task creation must submit the same files and options with that fingerprint. `TaskService` checks ownership, plan permissions, and preview consistency.
+
+Java 从持久化任务重建工具上下文，模型不能传入文件 ID 或业务规则。工作流必须先检查输入，再调用对应的确定性工具，最后导出结果。任务摘要保存规则、计数、警告和完整异常；对话只接收有限异常样例。
+
+Java reconstructs tool context from the persisted task; the model cannot supply file IDs or business rules. Each workflow inspects inputs, calls its matching deterministic tool, then exports the result. The task summary stores rules, counts, warnings, and full exceptions; the conversation receives only bounded exception samples.

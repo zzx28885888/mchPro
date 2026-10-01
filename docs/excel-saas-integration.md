@@ -22,6 +22,7 @@ Bring the business capabilities from `excel-ai-saas-v2` into this repository whi
 | Plans, monthly task quotas, file-size and tool-call limits | PostgreSQL plan and usage records, enforced by Spring Boot before dispatch and Java before execution |
 | MySQL schema and connector | Replaced by PostgreSQL using this repository's existing datasource and Compose service |
 | Embedded Excel SaaS page | `backend/src/main/resources/static/index.html`, served from `/` and wired to authenticated Spring Boot APIs |
+| Multi-file merge/clean, reconciliation, and summary | Typed Spring task preview/create contract plus deterministic Java workflow tools and downloadable result summaries |
 
 ## Target request flow
 
@@ -34,6 +35,7 @@ Browser
   -> Java Tool Registry (trusted task context)
   -> permission + schema validation + timeout + audit
   -> Java Excel tools / owned file storage
+  -> persisted workflow result summary (rules, counts, warnings, exceptions)
   -> LangGraph result
   -> Spring Boot task worker records output file ID and final task state
 ```
@@ -46,9 +48,10 @@ Task context (user ID, task ID, input file ID) must be supplied by the trusted S
 2. Move auth and account APIs onto the V1.6 backend, preserving the V1.6 PostgreSQL/Redis infrastructure and Java 21 runtime.
 3. Add private file storage and ownership-scoped upload, list, and download endpoints.
 4. Add asynchronous task lifecycle and plan/usage enforcement; dispatch orchestration to LangGraph with signed or otherwise service-authenticated task context.
-5. Register Excel read/filter/sort/top/export capabilities in Java `@AgentTool`, extending the tool invocation context without exposing tenant IDs as model-controlled arguments.
-6. Bring forward the SaaS UI and connect it to the consolidated APIs.
-7. Verify the full flow: register/login, upload, task execution through LangGraph and Java tools, progress/result retrieval, output download, cross-user denial, quota/file-size enforcement, and audit records.
+5. Register legacy Excel capabilities and typed merge/clean, reconciliation, summary, and export tools in Java `@AgentTool`; keep IDs and options out of model-controlled arguments.
+6. Add multi-file typed task preview and confirmation, dynamic worksheet/field configuration, and result-summary display to the SaaS UI.
+7. Apply the idempotent `infra/migrations/001_excel_workflows.sql` migration to existing databases.
+8. Verify auth, upload, typed preview/create, tool execution, result download, cross-user denial, quota/file-size enforcement, and audit records.
 
 ## Compatibility decisions
 
@@ -64,5 +67,6 @@ Task context (user ID, task ID, input file ID) must be supplied by the trusted S
 - Spring Boot authenticates users with JWT, stores uploaded and exported workbooks in the `excel_files` Docker volume, and tracks task progress in Redis.
 - Task context is supplied by the backend to LangGraph and forwarded to Java with a shared internal token. Java verifies file ownership and plan tool grants before execution.
 - Excel read/filter/sort/top/export are registered Java `@AgentTool` methods, preserving the V1.6 LangGraph → Java Tool Registry boundary.
+- Merge/clean, reconcile, and summary are available as bounded typed workflows. The user reviews a deterministic preview before task creation; each task persists the input IDs, workflow options, operation summary, and row-level exceptions.
 - The Excel rowset is held in Redis for the lifetime of task processing; output metadata and completed task state are stored in PostgreSQL.
 - Runtime check confirmed homepage HTTP 200, PostgreSQL/Redis health, auth route response, five registered Excel tools, and Agent health. A paid/remote LLM task was not triggered during verification.
