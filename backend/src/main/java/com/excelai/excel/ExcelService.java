@@ -50,6 +50,30 @@ public class ExcelService {
         return new ExcelWorkbook(result);
     }
 
+    public List<ExcelWorkbook.SheetSchema> inspectWorkbook(Path path) {
+        Map<Integer, ExcelWorkbook.SheetSchema> schemas = new LinkedHashMap<>();
+        EasyExcel.read(path.toFile(), new AnalysisEventListener<Map<Integer, String>>() {
+            @Override
+            public void invokeHeadMap(Map<Integer, String> headerMap, AnalysisContext context) {
+                int maxColumn = headerMap.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1);
+                List<String> headers = new ArrayList<>();
+                for (int column = 0; column <= maxColumn; column++) {
+                    headers.add(Objects.toString(headerMap.get(column), ""));
+                }
+                int sheetNo = context.readSheetHolder().getSheetNo();
+                schemas.put(sheetNo, new ExcelWorkbook.SheetSchema(context.readSheetHolder().getSheetName(), headers));
+            }
+
+            @Override
+            public void invoke(Map<Integer, String> rowData, AnalysisContext context) {
+            }
+
+            @Override
+            public void doAfterAllAnalysed(AnalysisContext context) {
+            }
+        }).doReadAll();
+        return new ArrayList<>(schemas.values());
+    }
     public List<Map<String, Object>> read(Path path) {
         ExcelWorkbook workbook = readWorkbook(path);
         if (workbook.sheets().isEmpty()) return new ArrayList<>();

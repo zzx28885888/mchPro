@@ -13,6 +13,13 @@ public record ExcelWorkbook(List<Sheet> sheets) {
         sheets = List.copyOf(sheets);
     }
 
+    /** 中文：工作表名称和表头元数据。English: Worksheet name and header metadata. */
+    public record SheetSchema(String name, List<String> headers) {
+        public SheetSchema {
+            headers = Collections.unmodifiableList(new ArrayList<>(headers));
+        }
+    }
+
     /** 中文：单个工作表的原始结构。English: Original tabular structure for one worksheet. */
     public record Sheet(String name, List<String> headers, List<List<String>> rows) {
         public Sheet {

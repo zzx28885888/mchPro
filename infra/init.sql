@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS ai_task (
     user_id BIGINT NOT NULL REFERENCES user_account(id),
     input_file_id BIGINT NOT NULL REFERENCES user_file(id),
     prompt TEXT NOT NULL,
+    workflow_type VARCHAR(32) NOT NULL DEFAULT 'FREEFORM',
+    workflow_options TEXT NOT NULL DEFAULT '{}',
+    result_summary TEXT,
     status VARCHAR(32) NOT NULL,
     progress INTEGER NOT NULL DEFAULT 0 CHECK (progress BETWEEN 0 AND 100),
     result_file_id BIGINT REFERENCES user_file(id),
@@ -58,6 +61,18 @@ CREATE TABLE IF NOT EXISTS ai_task (
 );
 -- 中文/English：按用户查看最近任务时的索引 / Index for a user's recent task history.
 CREATE INDEX IF NOT EXISTS idx_ai_task_owner_created ON ai_task(user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS ai_task_input (
+    task_id BIGINT NOT NULL REFERENCES ai_task(id) ON DELETE CASCADE,
+    file_id BIGINT NOT NULL REFERENCES user_file(id),
+    ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+    PRIMARY KEY (task_id, file_id),
+    UNIQUE (task_id, ordinal)
+);
+
+INSERT INTO ai_task_input(task_id,file_id,ordinal)
+SELECT id,input_file_id,0 FROM ai_task
+WHERE input_file_id IS NOT NULL ON CONFLICT DO NOTHING;
 
 -- 中文：每次已接受的任务记一笔额度消耗；task_id 唯一约束防止同任务重复计费。
 -- English: Records accepted task usage; the unique task_id prevents charging the same task twice.

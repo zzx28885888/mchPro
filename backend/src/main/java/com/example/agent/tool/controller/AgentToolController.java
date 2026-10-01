@@ -64,7 +64,10 @@ public class AgentToolController {
             Long taskId = number(context.get("taskId"));
             Long inputFileId = number(context.get("inputFileId"));
             var task = userId == null || taskId == null ? null : tasks.owned(taskId, userId);
-            if (task == null || !task.inputFileId().equals(inputFileId))
+            List<Long> taskInputIds = task == null ? List.of() : tasks.inputFileIds(taskId);
+            List<Long> suppliedInputIds = longList(context.get("inputFileIds"));
+            if (suppliedInputIds.isEmpty() && inputFileId != null) suppliedInputIds = List.of(inputFileId);
+            if (task == null || !Objects.equals(task.inputFileId(), inputFileId) || !taskInputIds.equals(suppliedInputIds))
                 throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN);
             String plan = users.findById(userId).planCode();
             if (!plans.toolEnabled(plan, toolName))
@@ -86,6 +89,16 @@ public class AgentToolController {
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED);
     }
 
+    private List<Long> longList(Object value) {
+        if (!(value instanceof List<?> values)) return List.of();
+        List<Long> result = new ArrayList<>();
+        for (Object item : values) {
+            Long parsed = number(item);
+            if (parsed == null) return List.of();
+            result.add(parsed);
+        }
+        return List.copyOf(result);
+    }
     private Long number(Object o) {
         return o instanceof Number n ? n.longValue() : null;
     }

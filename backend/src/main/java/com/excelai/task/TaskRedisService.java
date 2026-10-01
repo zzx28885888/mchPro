@@ -3,6 +3,7 @@ package com.excelai.task;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.Map;
 
 @Service
@@ -26,6 +27,21 @@ public class TaskRedisService {
         if (result != null) o.put(k, "resultFileId", result.toString());
     }
 
+    public void putPreview(Long userId, String fingerprint, String digest) {
+        r.opsForValue().set(previewKey(userId, fingerprint), digest, Duration.ofMinutes(15));
+    }
+
+    public String getPreview(Long userId, String fingerprint) {
+        return r.opsForValue().get(previewKey(userId, fingerprint));
+    }
+
+    public void deletePreview(Long userId, String fingerprint) {
+        r.delete(previewKey(userId, fingerprint));
+    }
+
+    private String previewKey(Long userId, String fingerprint) {
+        return "excelai:taskpreview:" + userId + ":" + fingerprint;
+    }
     public Map<Object, Object> get(Long id) {
         return r.opsForHash().entries("excelai:task:" + id);
     }
