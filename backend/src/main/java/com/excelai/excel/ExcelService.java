@@ -1,6 +1,8 @@
 package com.excelai.excel;
 
 import com.alibaba.excel.EasyExcel;
+import com.alibaba.excel.context.AnalysisContext;
+import com.alibaba.excel.event.AnalysisEventListener;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
@@ -8,45 +10,99 @@ import java.util.*;
 
 @Service
 /**
- * 中文：封装 EasyExcel 的首个工作表读写，把数据统一转换为“列名 -> 单元格值”的行列表。
- * English: Wraps EasyExcel's first-sheet import/export and represents each row as a column-name-to-cell-value map.
+ * 中文：封装 EasyExcel 的多工作表读写，并提供兼容旧工具的首表行映射读取。
+ * English: Wraps EasyExcel multi-sheet reading/writing and keeps a first-sheet row-map reader for existing tools.
  */
 public class ExcelService {
+    public ExcelWorkbook readWorkbook(Path path) {
+        Map<Integer, SheetBuilder> sheets = new LinkedHashMap<>();
+        EasyExcel.read(path.toFile(), new AnalysisEventListener<Map<Integer, String>>() {
+            @Override
+            public void invokeHeadMap(Map<Integer, String> headerMap, AnalysisContext context) {
+                int sheetNo = context.readSheetHolder().getSheetNo();
+                int maxColumn = headerMap.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1);
+                List<String> headers = new ArrayList<>();
+                for (int column = 0; column <= maxColumn; column++) {
+                    headers.add(Objects.toString(headerMap.get(column), ""));
+                }
+                sheets.put(sheetNo, new SheetBuilder(context.readSheetHolder().getSheetName(), headers));
+            }
+
+            @Override
+            public void invoke(Map<Integer, String> rowData, AnalysisContext context) {
+                SheetBuilder sheet = sheets.get(context.readSheetHolder().getSheetNo());
+                if (sheet == null) return;
+                List<String> row = new ArrayList<>();
+                for (int column = 0; column < sheet.headers.size(); column++) {
+                    row.add(Objects.toString(rowData.get(column), ""));
+                }
+                sheet.rows.add(row);
+            }
+
+            @Override
+            public void doAfterAllAnalysed(AnalysisContext context) {
+            }
+        }).doReadAll();
+
+        List<ExcelWorkbook.Sheet> result = sheets.values().stream()
+                .map(sheet -> new ExcelWorkbook.Sheet(sheet.name, sheet.headers, sheet.rows))
+                .toList();
+        return new ExcelWorkbook(result);
+    }
+
     public List<Map<String, Object>> read(Path path) {
-        // 中文：表头映射用于把 Excel 的列序号转换成稳定列名；空表头回退到 COL_n。
-        // English: The header map converts Excel column indexes into names; blank headers fall back to COL_n.
-        List<Map<String, Object>> rows = new ArrayList<>();
-        EasyExcel.read(path.toFile(), new com.alibaba.excel.event.AnalysisEventListener<Map<Integer, String>>() {
-            List<String> h = new ArrayList<>();
-
-            public void invokeHeadMap(Map<Integer, String> m, com.alibaba.excel.context.AnalysisContext c) {
-                h.clear();
-                int max = m.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1);
-                for (int i = 0; i <= max; i++) h.add(Objects.toString(m.get(i), "COL_" + i));
+        ExcelWorkbook workbook = readWorkbook(path);
+        if (workbook.sheets().isEmpty()) return new ArrayList<>();
+        ExcelWorkbook.Sheet sheet = workbook.sheets().get(0);
+        List<String> keys = uniqueHeaders(sheet.headers());
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (List<String> values : sheet.rows()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            for (int column = 0; column < keys.size(); column++) {
+                row.put(keys.get(column), values.get(column));
             }
-
-            public void invoke(Map<Integer, String> d, com.alibaba.excel.context.AnalysisContext c) {
-                Map<String, Object> r = new LinkedHashMap<>();
-                for (int i = 0; i < h.size(); i++) r.put(h.get(i), d.get(i));
-                rows.add(r);
-            }
-
-            public void doAfterAllAnalysed(com.alibaba.excel.context.AnalysisContext c) {
-            }
-        }).sheet().doRead();
-        return rows;
+            result.add(row);
+        }
+        return result;
     }
 
     public void write(Path path, List<Map<String, Object>> rows) {
-        // 中文：导出列顺序沿用第一行 Map 的插入顺序，确保表头和每行数据对齐。
-        // English: Export columns follow the first row's insertion order so headers and cell values stay aligned.
+        // 中文：结果列顺序沿用第一行 Map 的插入顺序，确保表头和每行数据对齐。
+        // English: Export columns follow the first row's insertion order so headers and every row stay aligned.
         if (rows.isEmpty()) {
             EasyExcel.write(path.toFile()).head(List.of(List.of("result"))).sheet().doWrite(List.of());
             return;
         }
-        List<String> hs = new ArrayList<>(rows.get(0).keySet());
-        List<List<String>> head = hs.stream().map(List::of).toList();
-        List<List<String>> data = rows.stream().map(r -> hs.stream().map(h -> Objects.toString(r.get(h), "")).toList()).toList();
+        List<String> headers = new ArrayList<>(rows.get(0).keySet());
+        List<List<String>> head = headers.stream().map(List::of).toList();
+        List<List<String>> data = rows.stream()
+                .map(row -> headers.stream().map(header -> Objects.toString(row.get(header), "")).toList())
+                .toList();
         EasyExcel.write(path.toFile()).head(head).sheet("result").doWrite(data);
+    }
+
+    private List<String> uniqueHeaders(List<String> headers) {
+        Set<String> used = new HashSet<>();
+        List<String> keys = new ArrayList<>();
+        for (int column = 0; column < headers.size(); column++) {
+            String base = headers.get(column) == null || headers.get(column).isBlank()
+                    ? "COL_" + column : headers.get(column);
+            String key = base;
+            int suffix = 2;
+            while (!used.add(key)) key = base + "__" + suffix++;
+            keys.add(key);
+        }
+        return keys;
+    }
+
+    private static final class SheetBuilder {
+        private final String name;
+        private final List<String> headers;
+        private final List<List<String>> rows = new ArrayList<>();
+
+        private SheetBuilder(String name, List<String> headers) {
+            this.name = name;
+            this.headers = headers;
+        }
     }
 }
