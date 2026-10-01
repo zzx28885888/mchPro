@@ -61,6 +61,7 @@ PostgreSQL remains the durable source of task/file metadata; Redis remains task 
 ## Product safeguards
 
 - Do not overwrite or mutate source workbooks.
+- Write all comments and docstrings added or modified for this phase in both Chinese and English; keep the two language versions semantically aligned.
 - Show chosen files, sheets, field mappings, matching keys, tolerances, grouping dimensions, and key operations before execution.
 - Reject ambiguous or missing required mappings rather than silently selecting a potentially incorrect column.
 - Preserve traceable row-level exception results for unmatched, duplicate, invalid, or skipped data.
