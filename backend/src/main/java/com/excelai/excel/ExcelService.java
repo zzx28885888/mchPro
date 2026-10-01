@@ -1,6 +1,7 @@
 package com.excelai.excel;
 
 import com.alibaba.excel.EasyExcel;
+import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.context.AnalysisContext;
 import com.alibaba.excel.event.AnalysisEventListener;
 import org.springframework.stereotype.Service;
@@ -90,6 +91,65 @@ public class ExcelService {
         return result;
     }
 
+    public void writeWorkbook(Path path, List<OutputSheet> outputSheets) {
+        ExcelWriter writer = EasyExcel.write(path.toFile()).build();
+        try {
+            int index = 0;
+            for (OutputSheet output : outputSheets) {
+                List<List<String>> head = output.headers().stream().map(List::of).toList();
+                List<List<String>> data = output.rows();
+                String name = safeSheetName(output.name(), index++);
+                writer.write(data, EasyExcel.writerSheet(name).head(head).build());
+            }
+        } finally {
+            writer.finish();
+        }
+        addBasicChartsWhenSupported(path, outputSheets);
+    }
+
+    private String safeSheetName(String name, int index) {
+        String safe = name == null ? "" : name.replaceAll("[\\\\/?*\\[\\]:]", "_").trim();
+        if (safe.isEmpty()) safe = "Sheet" + (index + 1);
+        return safe.length() > 31 ? safe.substring(0, 31) : safe;
+    }
+
+    private void addBasicChartsWhenSupported(Path path, List<OutputSheet> outputSheets) {
+        try (var input = java.nio.file.Files.newInputStream(path);
+             org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(input)) {
+            boolean changed = false;
+            for (OutputSheet output : outputSheets) {
+                if (output.headers().size() != 2 || output.rows().isEmpty()) continue;
+                String name = safeSheetName(output.name(), 0);
+                org.apache.poi.xssf.usermodel.XSSFSheet sheet = workbook.getSheet(name);
+                if (sheet == null) continue;
+                List<Double> chartValues = new ArrayList<>();
+                try {
+                    for (List<String> row : output.rows()) chartValues.add(Double.parseDouble(row.get(1)));
+                } catch (RuntimeException e) {
+                    continue;
+                }
+                for (int row = 1; row <= chartValues.size(); row++) sheet.getRow(row).getCell(1).setCellValue(chartValues.get(row - 1));
+                var drawing = sheet.createDrawingPatriarch();
+                var anchor = drawing.createAnchor(0, 0, 0, 0, 3, 1, 12, 18);
+                var chart = drawing.createChart(anchor);
+                chart.setTitleText(output.name());
+                var categories = chart.createCategoryAxis(org.apache.poi.xddf.usermodel.chart.AxisPosition.BOTTOM);
+                var values = chart.createValueAxis(org.apache.poi.xddf.usermodel.chart.AxisPosition.LEFT);
+                values.setCrosses(org.apache.poi.xddf.usermodel.chart.AxisCrosses.AUTO_ZERO);
+                var categoryData = org.apache.poi.xddf.usermodel.chart.XDDFDataSourcesFactory.fromStringCellRange(sheet,
+                        new org.apache.poi.ss.util.CellRangeAddress(1, output.rows().size(), 0, 0));
+                var valueData = org.apache.poi.xddf.usermodel.chart.XDDFDataSourcesFactory.fromNumericCellRange(sheet,
+                        new org.apache.poi.ss.util.CellRangeAddress(1, output.rows().size(), 1, 1));
+                var data = chart.createData(org.apache.poi.xddf.usermodel.chart.ChartTypes.BAR, categories, values);
+                data.addSeries(categoryData, valueData).setTitle(output.headers().get(1), null);
+                chart.plot(data);
+                changed = true;
+            }
+            if (changed) try (var output = java.nio.file.Files.newOutputStream(path)) { workbook.write(output); }
+        } catch (Exception ignored) {
+            // 中文：图表生成失败时保留已写出的数据工作簿。English: Keep the data workbook if optional chart generation fails.
+        }
+    }
     public void write(Path path, List<Map<String, Object>> rows) {
         // 中文：结果列顺序沿用第一行 Map 的插入顺序，确保表头和每行数据对齐。
         // English: Export columns follow the first row's insertion order so headers and every row stay aligned.

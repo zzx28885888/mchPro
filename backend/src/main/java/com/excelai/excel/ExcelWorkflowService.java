@@ -238,4 +238,73 @@ public class ExcelWorkflowService {
 
     private WorkflowResult.RowException rowException(String code, SheetInput input, int row, String message, String value) {
         return new WorkflowResult.RowException(code, input.fileId(), input.sheetName(), row + 2, "", message, value);
+    }    public WorkflowResult summarize(SheetInput input, SummaryOptions options) {
+        if (input == null || options == null) throw new IllegalArgumentException("A source sheet and summary options are required");
+        List<Integer> dimensionIndexes = options.dimensionColumns().stream().map(name -> uniqueHeaderIndex(input, name)).toList();
+        Integer measureIndex = options.measureColumn() == null || options.measureColumn().isBlank()
+                ? null : uniqueHeaderIndex(input, options.measureColumn());
+        if ("SUM".equals(options.aggregation()) && measureIndex == null) throw new IllegalArgumentException("SUM requires a measure column");
+        Integer dateIndex = options.dateColumn() == null ? null : uniqueHeaderIndex(input, options.dateColumn());
+        Map<List<String>, BigDecimal> totals = new LinkedHashMap<>();
+        List<WorkflowResult.RowException> exceptions = new ArrayList<>();
+        long includedRows = 0;
+        for (int rowIndex = 0; rowIndex < input.rows().size(); rowIndex++) {
+            List<String> row = input.rows().get(rowIndex);
+            List<String> group = new ArrayList<>();
+            for (int index : dimensionIndexes) group.add(input.value(row, index).trim());
+            if (dateIndex != null) {
+                String rawDate = input.value(row, dateIndex).trim();
+                try {
+                    LocalDate date = LocalDate.parse(rawDate, DateTimeFormatter.ofPattern(options.dateFormat().replace("yyyy", "uuuu"), Locale.ROOT).withResolverStyle(ResolverStyle.STRICT));
+                    group.add(periodLabel(date, options.datePeriod()));
+                } catch (RuntimeException e) {
+                    exceptions.add(rowException("INVALID_DATE", input, rowIndex, "Date excluded from period grouping / 日期无效，已从周期分组排除", rawDate));
+                    continue;
+                }
+            }
+            BigDecimal value = BigDecimal.ONE;
+            if ("SUM".equals(options.aggregation())) {
+                try { value = parseNumber(input.value(row, measureIndex).trim()); }
+                catch (RuntimeException e) {
+                    exceptions.add(new WorkflowResult.RowException("INVALID_AMOUNT", input.fileId(), input.sheetName(), rowIndex + 2, options.measureColumn(), "Measure is not a valid number and was excluded / 指标不是有效数字，已排除", input.value(row, measureIndex)));
+                    continue;
+                }
+            }
+            totals.merge(List.copyOf(group), value, BigDecimal::add);
+            includedRows++;
+        }
+        List<Map.Entry<List<String>, BigDecimal>> ranked = new ArrayList<>(totals.entrySet());
+        ranked.sort(Map.Entry.<List<String>, BigDecimal>comparingByValue().reversed().thenComparing(entry -> String.join("|", entry.getKey()), String.CASE_INSENSITIVE_ORDER));
+        List<String> headers = new ArrayList<>(options.dimensionColumns());
+        if (dateIndex != null) headers.add(options.dateColumn() + "_" + options.datePeriod());
+        headers.add(options.measureColumn() == null || options.measureColumn().isBlank() ? "count" : options.measureColumn() + "_" + options.aggregation().toLowerCase(Locale.ROOT));
+        List<List<String>> outputRows = ranked.stream().map(entry -> {
+            List<String> row = new ArrayList<>(entry.getKey());
+            row.add(entry.getValue().stripTrailingZeros().toPlainString());
+            return List.copyOf(row);
+        }).toList();
+        Map<String, Long> counts = new LinkedHashMap<>();
+        counts.put("sourceRows", (long) input.rows().size());
+        counts.put("groupCount", (long) outputRows.size());
+        counts.put("includedRows", includedRows);
+        counts.put("exceptionRows", (long) exceptions.size());
+        List<String> warnings = dateIndex == null ? List.of() : List.of("Date period: " + options.datePeriod() + " / 日期周期：" + options.datePeriod());
+        return new WorkflowResult(List.of(new OutputSheet("summary", headers, outputRows)), counts, warnings, exceptions);
+    }
+
+    private int uniqueHeaderIndex(SheetInput input, String header) {
+        List<Integer> matches = new ArrayList<>();
+        for (int i = 0; i < input.headers().size(); i++) if (header.equals(input.headers().get(i))) matches.add(i);
+        if (matches.size() != 1) throw new IllegalArgumentException("Required header is missing or ambiguous: " + header);
+        return matches.get(0);
+    }
+
+    private String periodLabel(LocalDate date, String period) {
+        return switch (period) {
+            case "DAY" -> date.toString();
+            case "MONTH" -> String.format(Locale.ROOT, "%04d-%02d", date.getYear(), date.getMonthValue());
+            case "QUARTER" -> date.getYear() + "-Q" + ((date.getMonthValue() - 1) / 3 + 1);
+            case "YEAR" -> String.valueOf(date.getYear());
+            default -> throw new IllegalArgumentException("Unsupported date period: " + period);
+        };
     }}

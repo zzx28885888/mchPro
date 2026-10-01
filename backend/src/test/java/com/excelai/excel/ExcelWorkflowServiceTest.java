@@ -85,4 +85,24 @@ class ExcelWorkflowServiceTest {    private static Map<String, List<String>> ord
 
     private static ReconcileOptions reconcileOptions(String leftKey, String rightKey, String leftValue, String rightValue, String tolerance) {
         return new ReconcileOptions(Map.of("id", leftKey), Map.of("id", rightKey), Map.of("amount", leftValue), Map.of("amount", rightValue), new java.math.BigDecimal(tolerance));
+    }    @Test
+    void summaryGroupsAndRanksByConfiguredDimensions() {
+        var input = new SheetInput(30L, "Sales", List.of("Region", "Amount"), List.of(List.of("East", "10"), List.of("West", "25"), List.of("East", "5")));
+        var result = new ExcelWorkflowService().summarize(input, new SummaryOptions("Amount", List.of("Region"), "SUM", null, null));
+        assertEquals(List.of(List.of("West", "25"), List.of("East", "15")), result.outputSheets().get(0).rows());
+    }
+
+    @Test
+    void summaryReportsInvalidDatesAndPeriodDefinition() {
+        var input = new SheetInput(30L, "Sales", List.of("Date", "Region", "Amount"), List.of(List.of("2026-01-02", "East", "10"), List.of("bad-date", "West", "20")));
+        var result = new ExcelWorkflowService().summarize(input, new SummaryOptions("Amount", List.of("Region"), "SUM", "Date", "MONTH", "yyyy-MM-dd"));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("MONTH")));
+        assertEquals(1, result.exceptions().stream().filter(e -> e.code().equals("INVALID_DATE")).count());
+    }
+
+    @Test
+    void summaryRejectsUnknownMeasureOrDimension() {
+        var input = new SheetInput(30L, "Sales", List.of("Region", "Amount"), List.of(List.of("East", "10")));
+        assertThrows(IllegalArgumentException.class, () -> new ExcelWorkflowService().summarize(input, new SummaryOptions("Missing", List.of("Region"), "SUM", null, null)));
+        assertThrows(IllegalArgumentException.class, () -> new ExcelWorkflowService().summarize(input, new SummaryOptions("Amount", List.of("Missing"), "SUM", null, null)));
     }}
