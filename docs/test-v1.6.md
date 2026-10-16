@@ -90,12 +90,17 @@ python app.py
 
 ## 9. Test Agent
 
+Set `AGENT_INTERNAL_TOKEN` in the shell to the same secret configured in `agent-service/.env` before starting the Agent. The `/agent/chat` endpoint now requires this token.
+
+启动 Agent 前，请将 shell 中的 `AGENT_INTERNAL_TOKEN` 设置为与 `agent-service/.env` 相同的密钥。`/agent/chat` 接口现在要求提供此令牌。
+
 ```powershell
-curl -X POST http://localhost:8000/agent/chat `
+curl.exe -X POST http://localhost:8000/agent/chat `
+  -H "X-Agent-Token: $env:AGENT_INTERNAL_TOKEN" `
   -H "Content-Type: application/json" `
   -d '{"message":"查询用户10001的信息"}'
 ```
 
-The intended path is:
+The intended path is / 调用链路如下：
 
 LLM -> LangGraph tool call -> HTTP -> Java Tool Registry -> getUser -> result -> LLM.

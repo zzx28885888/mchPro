@@ -1,5 +1,5 @@
-# 中文：Spring Boot 核心配置。带 ${ENV:default} 的值优先读环境变量，冒号后是本机开发默认值。
-# English: Core Spring Boot settings. ${ENV:default} reads an environment variable first and falls back to the local default.
+# 中文：Spring Boot 核心配置。非密钥可使用本机默认值；数据库密码和签名密钥必须从环境变量提供。
+# English: Core Spring Boot settings. Non-secret values may use local defaults; database and signing secrets must come from environment variables.
 spring:
   application:
     name: ai-agent-backend
@@ -7,7 +7,7 @@ spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/agent}
     username: ${SPRING_DATASOURCE_USERNAME:agent}
-    password: ${SPRING_DATASOURCE_PASSWORD:agent_dev_password}
+    password: ${SPRING_DATASOURCE_PASSWORD}
 
   data:
     redis:
@@ -36,7 +36,7 @@ agent:
     url: ${AGENT_SERVICE_URL:http://localhost:8000}
   # 中文：仅后端与 Agent 服务共享的服务间令牌；不要放到浏览器或公开日志。
   # English: Service-to-service token shared only by backend and Agent; never expose it to browsers or public logs.
-  internal-token: ${AGENT_INTERNAL_TOKEN:local-agent-token-change-me}
+  internal-token: ${AGENT_INTERNAL_TOKEN}
 
 app:
   storage:
@@ -44,9 +44,9 @@ app:
     # English: Private root for uploaded and generated workbooks; Compose mounts a persistent volume here.
     root: ${APP_STORAGE_ROOT:./data/files}
   jwt:
-    # 中文：用于 HMAC 签名的秘密，至少 32 字节；通过 .env/环境变量注入，不能提交真实值。
-    # English: HMAC signing secret, at least 32 bytes; inject through .env/environment and never commit its real value.
-    secret: ${JWT_SECRET:local-development-jwt-secret-change-me-32-bytes-minimum}
+    # 中文：用于 HMAC 签名的必需秘密，至少 32 字节；通过私有环境变量注入，不能使用占位值。
+    # English: Required HMAC signing secret, at least 32 bytes; inject through a private environment variable and never use a placeholder.
+    secret: ${JWT_SECRET}
     expiration-hours: ${JWT_EXPIRATION_HOURS:168}
   task:
     # 中文：异步任务线程池参数；队列满时不应无限吞入新任务。

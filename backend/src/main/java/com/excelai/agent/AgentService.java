@@ -11,9 +11,12 @@ import java.util.*;
 /** 中文：Spring 到 LangGraph Agent 服务的 HTTP 适配器。English: HTTP adapter from Spring task workers to LangGraph. */
 public class AgentService {
     private final RestClient client;
+    private final String internalToken;
 
-    public AgentService(@Value("${agent.service.url}") String url) {
+    public AgentService(@Value("${agent.service.url}") String url,
+                        @Value("${agent.internal-token}") String internalToken) {
         client = RestClient.builder().baseUrl(url).build();
+        this.internalToken = internalToken;
     }
 
     public String execute(Long userId, Long taskId, Long fileId, String prompt, int maxCalls) {
@@ -33,6 +36,7 @@ public class AgentService {
         context.put("options", options);
         context.put("maxToolCalls", maxCalls);
         Map<?, ?> response = client.post().uri("/agent/chat").contentType(MediaType.APPLICATION_JSON)
+                .header("X-Agent-Token", internalToken)
                 .body(Map.of("message", prompt, "context", context)).retrieve().body(Map.class);
         if (response == null || response.get("answer") == null)
             throw new IllegalStateException("Agent returned an empty response");

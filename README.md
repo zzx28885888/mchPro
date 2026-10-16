@@ -41,6 +41,26 @@ DeepSeek Harness 当前为 Developer Preview，因此本项目只做可选集成
 
 ### Docker 一键启动（推荐）
 
+#### 配置必需密钥 / Configure required secrets
+
+将 `.env.example` 复制为 `.env`，并为 `POSTGRES_PASSWORD`、`AGENT_INTERNAL_TOKEN` 和 `JWT_SECRET` 分别生成独立随机值。示例文件中的密钥留空；未填写时 Compose 会拒绝启动。
+
+Copy `.env.example` to `.env`, then generate independent random values for `POSTGRES_PASSWORD`, `AGENT_INTERNAL_TOKEN`, and `JWT_SECRET`. The example secrets are blank, and Compose refuses to start until they are set.
+
+在 PowerShell 中运行以下命令可生成三组随机值，然后将输出填入私有 `.env` 文件。不要提交 `.env` 或把同一个值用于多个密钥。
+
+Run the following PowerShell commands to generate three random values, then put the output in your private `.env` file. Do not commit `.env` or reuse one value for multiple secrets.
+
+```powershell
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+@('POSTGRES_PASSWORD', 'AGENT_INTERNAL_TOKEN', 'JWT_SECRET') | ForEach-Object {
+    $bytes = New-Object byte[] 32
+    $rng.GetBytes($bytes)
+    "$_=$([Convert]::ToBase64String($bytes))"
+}
+$rng.Dispose()
+```
+
 在项目根目录运行：
 
 ```powershell
@@ -54,7 +74,9 @@ docker compose ps
 - Agent 健康检查：<http://localhost:8000/health>
 - Java Tool Registry：由 Agent 服务使用内部共享令牌访问，不作为公开 API 使用
 
-首次启动前将 `.env.example` 复制为根目录 `.env`，按需填写 LLM 设置与密钥。使用 `LLM_PROVIDER=ollama` 时，需要宿主机 Ollama 正在运行并准备好模型；使用 `LLM_PROVIDER=remote` 时，配置远程 OpenAI 兼容服务。停止服务：`docker compose down`（保留数据库卷）。
+首次启动前将 `.env.example` 复制为根目录 `.env`，填写上文生成的密钥并按需填写 LLM 设置。使用 `LLM_PROVIDER=ollama` 时，需要宿主机 Ollama 正在运行并准备好模型；使用 `LLM_PROVIDER=remote` 时，配置远程 OpenAI 兼容服务。停止服务：`docker compose down`（保留数据库卷）。
+
+Before the first launch, copy `.env.example` to the repository root as `.env`, enter the generated secrets above, and configure LLM settings as needed. With `LLM_PROVIDER=ollama`, run Ollama on the host and prepare a model; with `LLM_PROVIDER=remote`, configure an OpenAI-compatible service. Stop the services with `docker compose down` (the database volume is preserved).
 
 如需远程 OpenAI 兼容模型，在根目录 `.env` 设置 `LLM_PROVIDER=remote`、`REMOTE_LLM_BASE_URL`、`REMOTE_LLM_API_KEY` 和 `REMOTE_LLM_MODEL`，然后运行 `docker compose up --build -d` 使配置生效。API Key 不要填入 `.env.example` 或提交到版本库。
 
@@ -73,6 +95,10 @@ ollama list
 ```
 
 ### 3. Python Agent
+
+本地单独运行 Agent 时，在 `agent-service/.env` 中设置与根目录 `.env` 完全相同的 `AGENT_INTERNAL_TOKEN`。
+
+When running the Agent locally by itself, set `AGENT_INTERNAL_TOKEN` in `agent-service/.env` to exactly the same value as in the repository-root `.env`.
 
 ```powershell
 cd agent-service

@@ -8,9 +8,10 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-agent}
       POSTGRES_USER: ${POSTGRES_USER:-agent}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agent_dev_password}
+      # 中文/English：生产和本地私有环境都必须提供数据库密码 / Set the database password in the private local or production environment.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
@@ -27,7 +28,7 @@ services:
     container_name: ai-agent-redis
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
@@ -54,11 +55,11 @@ services:
       JAVA_TOOL_REGISTRY_URL: http://backend:8080/internal/agent/tools
       JAVA_TOOL_PRINCIPAL: langgraph
       # 中文/English：仅 Agent 与后端共享的内部鉴权令牌 / Internal service token shared with the backend.
-      AGENT_INTERNAL_TOKEN: ${AGENT_INTERNAL_TOKEN:-local-agent-token-change-me}
+      AGENT_INTERNAL_TOKEN: ${AGENT_INTERNAL_TOKEN:?Set AGENT_INTERNAL_TOKEN in .env}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "${AGENT_PORT:-8000}:8000"
+      - "127.0.0.1:${AGENT_PORT:-8000}:8000"
 
   backend:
     # 中文：Spring Boot 承载页面、认证、业务 API、文件存储适配、任务 Worker 和 Java Tool Registry。
@@ -77,12 +78,12 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agent}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-agent}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-agent_dev_password}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       AGENT_SERVICE_URL: http://agent-service:8000
-      AGENT_INTERNAL_TOKEN: ${AGENT_INTERNAL_TOKEN:-local-agent-token-change-me}
-      JWT_SECRET: ${JWT_SECRET:-local-development-jwt-secret-change-me-32-bytes-minimum}
+      AGENT_INTERNAL_TOKEN: ${AGENT_INTERNAL_TOKEN:?Set AGENT_INTERNAL_TOKEN in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       APP_STORAGE_ROOT: /app/data/files
     ports:
       - "${BACKEND_PORT:-8080}:8080"
