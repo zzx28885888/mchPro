@@ -1,0 +1,22 @@
+[project]
+name = "low-cost-ai-agent"
+version = "1.6.0"
+description = "LangGraph Agent service for Excel workflows"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.34,<1",
+    "langgraph>=0.6,<2",
+    "langchain-core>=0.3,<2",
+    "langchain-ollama>=0.3,<2",
+    "langchain-openai>=0.3,<2",
+    "pydantic-settings>=2.7,<3",
+    "httpx>=0.27,<1",
+    "python-dotenv>=1,<2",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+
+[tool.uv]
+package = false

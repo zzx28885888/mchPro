@@ -77,15 +77,18 @@ Expected:
 
 `TOOL_TIMEOUT`
 
-## 8. Start Python Agent
+## 8. Start Python Agent / 启动 Python Agent
+
+Use Python 3.13 and `uv` from the `agent-service` directory. `uv sync` installs the project dependencies from the committed lockfile; `pytest` is included only in the development dependency group.
+
+在 `agent-service` 目录使用 Python 3.13 和 `uv`。`uv sync` 根据已提交的锁文件安装项目依赖；`pytest` 仅包含在开发依赖组中。
 
 ```powershell
 cd agent-service
-uv venv --python 3.12
-.venv\Scripts\activate
-uv pip install -r requirements.txt
+uv python install 3.13
+uv sync
 copy .env.example .env
-python app.py
+uv run uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
 ## 9. Test Agent

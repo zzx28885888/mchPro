@@ -14,12 +14,16 @@ services:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infra/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agent} -d ${POSTGRES_DB:-agent}"]
       interval: 5s
       timeout: 3s
       retries: 20
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     # 中文：Redis 用于健康检查和任务处理期间的 Excel 行集缓存。
@@ -37,6 +41,11 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   agent-service:
     # 中文：Python/LangGraph 负责理解提示词并决定调用哪些 Java 工具。
@@ -61,6 +70,17 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:${AGENT_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   backend:
     # 中文：Spring Boot 承载页面、认证、业务 API、文件存储适配、任务 Worker 和 Java Tool Registry。
@@ -75,7 +95,7 @@ services:
       redis:
         condition: service_healthy
       agent-service:
-        condition: service_started
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-agent}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-agent}
@@ -98,6 +118,17 @@ services:
       # 中文：命名卷让容器重建后仍保留用户上传和生成的工作簿。
       # English: The named volume preserves uploaded and generated workbooks across container recreation.
       - excel_files:/app/data/files
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   postgres_data:
