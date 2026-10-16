@@ -31,7 +31,9 @@ DeepSeek Harness 当前为 Developer Preview，因此本项目只做可选集成
 
 ## Excel SaaS 合并目标
 
-此仓库作为唯一技术底座，承接 `excel-ai-saas-v2` 的前端、注册登录、用户文件、异步任务、套餐/额度和 Excel 操作业务。业务由 Spring Boot 提供 API 和 Java Tool Registry；LangGraph 负责 Agent 编排；PostgreSQL 保存业务数据，Redis 保存任务进度和会话状态。Excel 文件通过 V1.6 LangGraph → Java Tool Registry 流程处理；不引入 V2 的 MySQL 或独立 Java AgentExecutor。
+此仓库作为唯一技术底座，承接 `excel-ai-saas-v2` 的前端、注册登录、用户文件、异步任务、套餐/额度和 Excel 操作业务。业务由 Spring Boot 提供 API 和 Java Tool Registry；LangGraph 负责 Agent 编排；PostgreSQL 保存业务数据、额度记录和可恢复任务状态，Redis 保存短期预览及任务处理期间的 Excel 行集。Excel 文件通过 V1.6 LangGraph → Java Tool Registry 流程处理；不引入 V2 的 MySQL 或独立 Java AgentExecutor。
+
+This repository is the single technical foundation for the frontend, authentication, user files, asynchronous jobs, plans/quotas, and Excel operations from `excel-ai-saas-v2`. Spring Boot provides the API and Java Tool Registry; LangGraph orchestrates the Agent; PostgreSQL stores business data, quota records, and recoverable task state, while Redis stores short-lived previews and Excel rows during task processing. Excel workbooks follow the V1.6 LangGraph → Java Tool Registry flow; V2's MySQL and standalone Java AgentExecutor are not introduced.
 
 迁移说明见 `docs/excel-saas-integration.md`。PostgreSQL 初始化脚本包含 SaaS 业务表及 FREE/BASIC/PRO 初始套餐。
 
@@ -79,6 +81,10 @@ docker compose ps
 - 后端健康检查：<http://localhost:8080/api/health>
 - Agent 健康检查：<http://localhost:8000/health>
 - Java Tool Registry：由 Agent 服务使用内部共享令牌访问，不作为公开 API 使用
+
+任务由 PostgreSQL 持久化并由后端定时派发；后端重启后会重新排队未完成任务。月度额度检查与任务创建共用数据库事务。Java 工具最长执行时间为 60 秒，Agent→Java HTTP 读取超时默认 75 秒；可通过 `JAVA_TOOL_HTTP_TIMEOUT` 调整。
+
+Tasks are persisted in PostgreSQL and dispatched by a backend scheduler; unfinished tasks are requeued after a backend restart. Monthly quota checks and task creation share a database transaction. Java tools run for up to 60 seconds, and the Agent-to-Java HTTP read timeout defaults to 75 seconds; adjust it with `JAVA_TOOL_HTTP_TIMEOUT`.
 
 上传接口仅接受当前用户套餐大小限制内的有效 `.xlsx` 工作簿；ZIP 最多 10,000 个条目、实际累计解压不超过 256 MiB、单条目不超过 64 MiB，POI 最小解压比例为 1%。`.xls`、空文件、伪装文件及超过套餐限制的文件会在写入永久存储前被拒绝。
 

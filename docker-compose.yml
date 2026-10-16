@@ -22,8 +22,8 @@ services:
       retries: 20
 
   redis:
-    # 中文：Redis 用于健康检查、任务进度和任务处理期间的 Excel 行集缓存。
-    # English: Redis stores live task progress and temporary per-task Excel rows, and is health-checked by the backend.
+    # 中文：Redis 用于健康检查和任务处理期间的 Excel 行集缓存。
+    # English: Redis is health-checked by the backend and stores temporary per-task Excel rows.
     image: redis:8-alpine
     container_name: ai-agent-redis
     restart: unless-stopped
@@ -54,6 +54,7 @@ services:
       REMOTE_LLM_MODEL: ${REMOTE_LLM_MODEL:-}
       JAVA_TOOL_REGISTRY_URL: http://backend:8080/internal/agent/tools
       JAVA_TOOL_PRINCIPAL: langgraph
+      JAVA_TOOL_HTTP_TIMEOUT: ${JAVA_TOOL_HTTP_TIMEOUT:-75}
       # 中文/English：仅 Agent 与后端共享的内部鉴权令牌 / Internal service token shared with the backend.
       AGENT_INTERNAL_TOKEN: ${AGENT_INTERNAL_TOKEN:?Set AGENT_INTERNAL_TOKEN in .env}
     extra_hosts:

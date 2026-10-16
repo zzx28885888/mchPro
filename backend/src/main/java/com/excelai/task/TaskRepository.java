@@ -59,10 +59,27 @@ public class TaskRepository {
         return task == null || task.getInputFileId() == null ? List.of() : List.of(task.getInputFileId());
     }
 
-    public void running(Long id) {
-        mapper.update(null, new UpdateWrapper<AiTaskEntity>()
-                .eq("id", id).set("status", "RUNNING").set("progress", 10)
-                .set("started_at", LocalDateTime.now()));
+    public List<Long> queuedIds(int limit) {
+        return jdbc.query("SELECT id FROM ai_task WHERE status='QUEUED' ORDER BY created_at,id LIMIT ?",
+                (rs, rowNum) -> rs.getLong(1), limit);
+    }
+
+    public boolean claimQueued(Long id) {
+        return jdbc.update("UPDATE ai_task SET status='RUNNING',progress=10,started_at=? WHERE id=? AND status='QUEUED'",
+                LocalDateTime.now(), id) == 1;
+    }
+
+    public void requeue(Long id) {
+        jdbc.update("UPDATE ai_task SET status='QUEUED',progress=0,started_at=NULL WHERE id=? AND status='RUNNING'", id);
+    }
+
+    public void recoverRunning() {
+        jdbc.update("UPDATE ai_task SET status='QUEUED',progress=0,started_at=NULL WHERE status='RUNNING'");
+    }
+
+    public Task findById(Long id) {
+        var entity = mapper.selectById(id);
+        return entity == null ? null : toTask(entity);
     }
 
     public void done(Long id, Long resultFileId) {
@@ -72,8 +89,10 @@ public class TaskRepository {
     }
 
     public void fail(Long id, String message) {
+        String safeMessage = message == null ? "Task failed" : message;
+        if (safeMessage.length() > 2000) safeMessage = safeMessage.substring(0, 2000);
         mapper.update(null, new UpdateWrapper<AiTaskEntity>()
-                .eq("id", id).set("status", "FAILED").set("error_message", message)
+                .eq("id", id).set("status", "FAILED").set("progress", 100).set("error_message", safeMessage)
                 .set("completed_at", LocalDateTime.now()));
     }
 
@@ -83,7 +102,11 @@ public class TaskRepository {
 
     public Task owned(Long id, Long userId) {
         var entity = mapper.selectOne(new QueryWrapper<AiTaskEntity>().eq("id", id).eq("user_id", userId));
-        return entity == null ? null : new Task(entity.getId(), entity.getUserId(), entity.getInputFileId(),
+        return entity == null ? null : toTask(entity);
+    }
+
+    private Task toTask(AiTaskEntity entity) {
+        return new Task(entity.getId(), entity.getUserId(), entity.getInputFileId(),
                 entity.getPrompt(), entity.getWorkflowType(), entity.getWorkflowOptions(), entity.getStatus(),
                 entity.getProgress(), entity.getResultFileId(), entity.getErrorMessage(), entity.getResultSummary());
     }

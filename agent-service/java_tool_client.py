@@ -24,12 +24,13 @@ class JavaToolRegistryClient:
             "http://localhost:8080/internal/agent/tools"
         ).rstrip("/")
         self.principal = os.getenv("JAVA_TOOL_PRINCIPAL", "langgraph")
-        self.timeout = float(os.getenv("JAVA_TOOL_HTTP_TIMEOUT", "10"))
+        self.timeout = float(os.getenv("JAVA_TOOL_HTTP_TIMEOUT", "75"))
+        self.http_timeout = httpx.Timeout(self.timeout, connect=min(5.0, self.timeout))
         self.internal_token = os.getenv("AGENT_INTERNAL_TOKEN", "")
         self.headers = {"X-Agent-Token": self.internal_token}
 
     async def list_tools(self) -> list[dict]:
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self.http_timeout) as client:
             response = await client.get(self.base_url, headers=self.headers)
             response.raise_for_status()
             return response.json()
@@ -49,7 +50,7 @@ class JavaToolRegistryClient:
             "principal": self.principal,
             "context": {k: ctx[k] for k in ("userId", "taskId", "inputFileId", "inputFileIds", "workflowType", "options", "maxToolCalls") if k in ctx},
         }
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self.http_timeout) as client:
             response = await client.post(
                 f"{self.base_url}/{name}/execute",
                 json=payload,
