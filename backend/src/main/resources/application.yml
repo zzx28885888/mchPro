@@ -54,3 +54,13 @@ app:
     core-pool-size: ${TASK_CORE_POOL_SIZE:4}
     max-pool-size: ${TASK_MAX_POOL_SIZE:8}
     queue-capacity: ${TASK_QUEUE_CAPACITY:100}
+  rate-limit:
+    registration:
+      max-requests: ${RATE_LIMIT_REGISTRATION_MAX_REQUESTS:5}
+      window: ${RATE_LIMIT_REGISTRATION_WINDOW:1h}
+    login:
+      max-requests: ${RATE_LIMIT_LOGIN_MAX_REQUESTS:10}
+      window: ${RATE_LIMIT_LOGIN_WINDOW:15m}
+    tasks:
+      max-requests: ${RATE_LIMIT_TASKS_MAX_REQUESTS:10}
+      window: ${RATE_LIMIT_TASKS_WINDOW:1m}

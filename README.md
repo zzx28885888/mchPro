@@ -61,6 +61,12 @@ $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
 $rng.Dispose()
 ```
 
+#### API 速率限制 / API rate limits
+
+认证与任务接口使用 Redis 固定窗口限流：注册默认每个客户端 IP 每小时 5 次，登录每 15 分钟 10 次，任务预览和创建合计每用户每分钟 10 次。超限返回 HTTP 429 和 `Retry-After`；Redis 不可用时这些写入接口返回 503。可通过 `.env` 中的 `RATE_LIMIT_*` 变量调整次数和窗口。限流使用 socket 对端 IP，忽略未验证的 `X-Forwarded-For`；部署在同一反向代理后的客户端会共享认证限流桶。
+
+Authentication and task endpoints use Redis fixed-window limits: registration defaults to 5 requests per client IP per hour, login to 10 per 15 minutes, and task preview plus creation to 10 per user per minute. Exceeded limits return HTTP 429 with `Retry-After`; these write endpoints return 503 when Redis is unavailable. Adjust limits and windows with the `RATE_LIMIT_*` variables in `.env`. The limiter uses the socket peer IP and ignores unverified `X-Forwarded-For`; clients behind the same reverse proxy share an authentication limit bucket.
+
 在项目根目录运行：
 
 ```powershell
@@ -73,6 +79,10 @@ docker compose ps
 - 后端健康检查：<http://localhost:8080/api/health>
 - Agent 健康检查：<http://localhost:8000/health>
 - Java Tool Registry：由 Agent 服务使用内部共享令牌访问，不作为公开 API 使用
+
+上传接口仅接受当前用户套餐大小限制内的有效 `.xlsx` 工作簿；ZIP 最多 10,000 个条目、实际累计解压不超过 256 MiB、单条目不超过 64 MiB，POI 最小解压比例为 1%。`.xls`、空文件、伪装文件及超过套餐限制的文件会在写入永久存储前被拒绝。
+
+Uploads accept only valid `.xlsx` workbooks within the authenticated user's plan size limit. ZIP archives are limited to 10,000 entries and 256 MiB of actual aggregate expansion, each entry is limited to 64 MiB, and POI enforces a 1% minimum inflate ratio. `.xls`, empty files, disguised content, and files over the plan limit are rejected before permanent storage.
 
 首次启动前将 `.env.example` 复制为根目录 `.env`，填写上文生成的密钥并按需填写 LLM 设置。使用 `LLM_PROVIDER=ollama` 时，需要宿主机 Ollama 正在运行并准备好模型；使用 `LLM_PROVIDER=remote` 时，配置远程 OpenAI 兼容服务。停止服务：`docker compose down`（保留数据库卷）。
 

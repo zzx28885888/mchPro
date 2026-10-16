@@ -5,7 +5,7 @@ import org.springframework.context.annotation.*;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @Configuration
-@EnableConfigurationProperties(AppProperties.class)
+@EnableConfigurationProperties({AppProperties.class, RateLimitProperties.class})
 /** 中文：声明应用级 Spring Bean 配置，例如异步任务线程池。English: Declares application-level Spring beans such as the asynchronous task pool. */
 public class AppConfig {
     @Bean("taskExecutor")
