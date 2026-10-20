@@ -54,6 +54,62 @@ class ExcelWorkflowServiceTest {    private static Map<String, List<String>> ord
         assertTrue(result.exceptions().stream().anyMatch(e -> e.code().equals("INVALID_DATE")));
         assertTrue(result.exceptions().stream().anyMatch(e -> e.code().equals("INVALID_AMOUNT")));
     }
+
+    @Test
+    void mergeReviewKeepsOrSkipsDuplicateAndBlankRows() {
+        var input = new SheetInput(10L, "Data", List.of("SKU", "Amount"), List.of(
+                List.of("A", "1"), List.of("A", "1"), List.of("A", "1"), List.of("", ""), List.of("", "")));
+        var options = new MergeOptions(orderedMap("SKU", List.of("SKU"), "Amount", List.of("Amount")),
+                List.of("SKU"), true, Map.of(), Set.of());
+        var decisions = Map.of(
+                new MergeReviewDecision.SourceRowKey(10L, "Data", 3),
+                new MergeReviewDecision.Decision(MergeReviewDecision.Action.KEEP, Map.of()),
+                new MergeReviewDecision.SourceRowKey(10L, "Data", 4),
+                new MergeReviewDecision.Decision(MergeReviewDecision.Action.SKIP, Map.of()),
+                new MergeReviewDecision.SourceRowKey(10L, "Data", 5),
+                new MergeReviewDecision.Decision(MergeReviewDecision.Action.KEEP, Map.of()));
+
+        WorkflowResult result = new ExcelWorkflowService().mergeAndClean(List.of(input), options, decisions);
+
+        assertEquals(List.of(List.of("A", "1"), List.of("A", "1"), List.of("", "")), result.outputSheets().get(0).rows());
+        assertEquals(0L, result.counts().get("duplicatesRemoved"));
+        assertEquals(1L, result.counts().get("blankRowsSkipped"));
+        assertEquals(1L, result.counts().get("reviewedRowsSkipped"));
+    }
+
+    @Test
+    void mergeReviewCorrectsAllReportedDateAndAmountCells() {
+        var input = new SheetInput(10L, "Data", List.of("SKU", "Date", "Amount"),
+                List.of(List.of("A", "bad-date", "$oops")));
+        var options = new MergeOptions(orderedMap("SKU", List.of("SKU"), "Date", List.of("Date"), "Amount", List.of("Amount")),
+                List.of(), true, Map.of("Date", "MM/dd/yyyy"), Set.of("Amount"));
+        var rowKey = new MergeReviewDecision.SourceRowKey(10L, "Data", 2);
+        var decision = new MergeReviewDecision.Decision(MergeReviewDecision.Action.CORRECT,
+                Map.of("Date", "02/03/2026", "Amount", "$23.50"));
+
+        WorkflowResult result = new ExcelWorkflowService().mergeAndClean(List.of(input), options, Map.of(rowKey, decision));
+
+        assertEquals(List.of(List.of("A", "2026-02-03", "23.5")), result.outputSheets().get(0).rows());
+        assertFalse(result.exceptions().stream().anyMatch(issue -> issue.fileId().equals(10L) && issue.rowNumber() == 2));
+    }
+
+    @Test
+    void mergeReviewRejectsIncompleteOrUnreportedCorrections() {
+        var input = new SheetInput(10L, "Data", List.of("Date", "Amount"), List.of(List.of("bad-date", "$oops")));
+        var options = new MergeOptions(orderedMap("Date", List.of("Date"), "Amount", List.of("Amount")),
+                List.of(), true, Map.of("Date", "yyyy-MM-dd"), Set.of("Amount"));
+        var rowKey = new MergeReviewDecision.SourceRowKey(10L, "Data", 2);
+
+        assertThrows(IllegalArgumentException.class, () -> new ExcelWorkflowService().mergeAndClean(List.of(input), options,
+                Map.of(rowKey, new MergeReviewDecision.Decision(MergeReviewDecision.Action.CORRECT,
+                        Map.of("Date", "2026-02-03")))));
+        assertThrows(IllegalArgumentException.class, () -> new ExcelWorkflowService().mergeAndClean(List.of(input), options,
+                Map.of(rowKey, new MergeReviewDecision.Decision(MergeReviewDecision.Action.CORRECT,
+                        Map.of("Date", "2026-02-03", "Amount", "23", "Other", "x")))));
+        assertThrows(IllegalArgumentException.class, () -> new ExcelWorkflowService().mergeAndClean(List.of(input), options,
+                Map.of(rowKey, new MergeReviewDecision.Decision(MergeReviewDecision.Action.CORRECT,
+                        Map.of("Date", "not-a-date", "Amount", "23")))));
+    }
     @Test
     void reconciliationReportsBlankAndDuplicateKeys() {
         var left = new SheetInput(20L, "L", List.of("ID", "Amount"), List.of(List.of("A", "10"), List.of("A", "11"), List.of("", "12")));

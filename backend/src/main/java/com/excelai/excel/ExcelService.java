@@ -4,6 +4,7 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.context.AnalysisContext;
 import com.alibaba.excel.event.AnalysisEventListener;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
@@ -11,11 +12,23 @@ import java.util.*;
 
 @Service
 /**
- * 中文：封装 EasyExcel 的多工作表读写，并提供兼容旧工具的首表行映射读取。
- * English: Wraps EasyExcel multi-sheet reading/writing and keeps a first-sheet row-map reader for existing tools.
+ * 中文：统一读取 XLSX/CSV 表格，封装 XLSX 多工作表写入，并提供兼容旧工具的首表行映射读取。
+ * English: Reads XLSX/CSV tables, wraps XLSX multi-sheet writing, and keeps a first-sheet row-map reader for existing tools.
  */
 public class ExcelService {
+    private final CsvService csv;
+
+    public ExcelService() {
+        this(new CsvService());
+    }
+
+    @Autowired
+    public ExcelService(CsvService csv) {
+        this.csv = csv;
+    }
+
     public ExcelWorkbook readWorkbook(Path path) {
+        if (isCsv(path)) return new ExcelWorkbook(List.of(csv.read(path)));
         Map<Integer, SheetBuilder> sheets = new LinkedHashMap<>();
         EasyExcel.read(path.toFile(), new AnalysisEventListener<Map<Integer, String>>() {
             @Override
@@ -52,6 +65,9 @@ public class ExcelService {
     }
 
     public List<ExcelWorkbook.SheetSchema> inspectWorkbook(Path path) {
+        if (isCsv(path)) {
+            return List.of(csv.inspect(path));
+        }
         Map<Integer, ExcelWorkbook.SheetSchema> schemas = new LinkedHashMap<>();
         EasyExcel.read(path.toFile(), new AnalysisEventListener<Map<Integer, String>>() {
             @Override
@@ -177,6 +193,10 @@ public class ExcelService {
             keys.add(key);
         }
         return keys;
+    }
+
+    private boolean isCsv(Path path) {
+        return path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".csv");
     }
 
     private static final class SheetBuilder {

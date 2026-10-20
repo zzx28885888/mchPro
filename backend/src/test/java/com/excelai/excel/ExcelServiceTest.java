@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,6 +31,21 @@ class ExcelServiceTest {
         ExcelWorkbook.Sheet sheet = new ExcelService().readWorkbook(path).sheets().get(0);
         assertEquals(List.of("SKU", "", "SKU"), sheet.headers());
         assertEquals(List.of("A-1", "", "A-2"), sheet.rows().get(0));
+    }
+
+    @Test
+    void readsCsvAsSingleLogicalSheetAndInspectsItsHeaders() throws Exception {
+        Path path = tempDir.resolve("sales.csv");
+        Files.writeString(path, "名称,金额\r\n苹果,12\r\n", StandardCharsets.UTF_8);
+        ExcelService service = new ExcelService();
+
+        ExcelWorkbook workbook = service.readWorkbook(path);
+
+        assertEquals(1, workbook.sheets().size());
+        assertEquals("csv_data", workbook.sheets().get(0).name());
+        assertEquals(List.of("名称", "金额"), workbook.sheets().get(0).headers());
+        assertEquals(List.of(List.of("苹果", "12")), workbook.sheets().get(0).rows());
+        assertEquals(List.of(new ExcelWorkbook.SheetSchema("csv_data", List.of("名称", "金额"))), service.inspectWorkbook(path));
     }
 
     @Test

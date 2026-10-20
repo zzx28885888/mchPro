@@ -41,7 +41,7 @@ public class ExcelAgentTools {
         return v instanceof Number n ? n.longValue() : null;
     }
 
-    @AgentTool(name = "read_excel", description = "Read the uploaded Excel workbook for this task. Call before filtering or sorting.", permission = "excel:read_excel", timeoutMs = 30000)
+    @AgentTool(name = "read_excel", description = "Read the uploaded Excel workbook or CSV table for this task. Call before filtering or sorting.", permission = "excel:read_excel", timeoutMs = 30000)
     public Map<String, Object> read() throws Exception {
         // 中文：必须根据任务绑定的 inputFileId 查询该用户拥有的文件，再读取私有存储中的工作簿。
         // English: Resolve the task-bound inputFileId through an ownership-scoped lookup before reading the private workbook.

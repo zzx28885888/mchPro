@@ -1,6 +1,7 @@
 package com.excelai.file;
 
 import com.excelai.common.ApiException;
+import com.excelai.excel.CsvService;
 import com.excelai.plan.PlanRepository;
 import com.excelai.user.UserRepository;
 import org.springframework.http.*;
@@ -15,20 +16,22 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/files")
 /**
- * 中文：处理当前登录用户的 Excel 上传与下载；响应和数据库记录只暴露文件 ID，不暴露服务器路径。
- * English: Handles Excel upload/download for the authenticated user; APIs expose file IDs, never server paths.
+ * 中文：处理当前登录用户的 XLSX/CSV 上传与下载；响应和数据库记录只暴露文件 ID，不暴露服务器路径。
+ * English: Handles XLSX/CSV uploads and downloads for the authenticated user; APIs expose file IDs, never server paths.
  */
 public class FileController {
     private final FileStorageService storage;
     private final FileRepository repo;
     private final UserRepository users;
     private final PlanRepository plans;
+    private final CsvService csv;
 
-    public FileController(FileStorageService s, FileRepository r, UserRepository users, PlanRepository plans) {
+    public FileController(FileStorageService s, FileRepository r, UserRepository users, PlanRepository plans, CsvService csv) {
         storage = s;
         repo = r;
         this.users = users;
         this.plans = plans;
+        this.csv = csv;
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -38,15 +41,16 @@ public class FileController {
         if (file.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "file is empty");
         Long uid = (Long) a.getPrincipal();
         String originalName = file.getOriginalFilename();
-        if (originalName == null || originalName.isBlank() || !xlsxFilename(originalName)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "a valid .xlsx filename is required");
+        if (originalName == null || originalName.isBlank() || !supportedFilename(originalName)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "a valid .xlsx or .csv filename is required");
         }
         var user = users.findById(uid);
         if (user == null) throw new ApiException(HttpStatus.NOT_FOUND, "user not found");
         var plan = plans.findByCode(user.planCode());
         if (plan == null) throw new ApiException(HttpStatus.FORBIDDEN, "user plan unavailable");
         if (file.getSize() > plan.maxFileSize()) throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "file exceeds plan limit");
-        storage.validateXlsx(file);
+        if (csvFilename(originalName)) csv.validate(file.getBytes());
+        else storage.validateXlsx(file);
         var x = storage.save(file);
         try {
             Long id = repo.insert(uid, originalName, x.name(), x.path(), x.size(), x.type(), "INPUT");
@@ -70,9 +74,22 @@ public class FileController {
         return new org.springframework.core.io.FileSystemResource(p);
     }
 
+    private boolean supportedFilename(String originalName) {
+        return xlsxFilename(originalName) || csvFilename(originalName);
+    }
+
     private boolean xlsxFilename(String originalName) {
-        String leaf = originalName.replace('\\', '/');
-        leaf = leaf.substring(leaf.lastIndexOf('/') + 1);
+        String leaf = leafName(originalName);
         return leaf.toLowerCase(Locale.ROOT).endsWith(".xlsx");
+    }
+
+    private boolean csvFilename(String originalName) {
+        String leaf = leafName(originalName);
+        return leaf.toLowerCase(Locale.ROOT).endsWith(".csv");
+    }
+
+    private String leafName(String originalName) {
+        String leaf = originalName.replace('\\', '/');
+        return leaf.substring(leaf.lastIndexOf('/') + 1);
     }
 }

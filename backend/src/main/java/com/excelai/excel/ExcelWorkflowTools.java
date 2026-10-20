@@ -22,21 +22,24 @@ public class ExcelWorkflowTools {
     private final FileRepository files;
     private final FileStorageService storage;
     private final ExcelService excel;
+    private final CsvService csv;
     private final ExcelWorkflowService workflows;
     private final ObjectMapper mapper;
 
     public ExcelWorkflowTools(TaskDataService data, TaskRepository tasks, FileRepository files,
-                             FileStorageService storage, ExcelService excel, ExcelWorkflowService workflows, ObjectMapper mapper) {
+                             FileStorageService storage, ExcelService excel, CsvService csv,
+                             ExcelWorkflowService workflows, ObjectMapper mapper) {
         this.data = data;
         this.tasks = tasks;
         this.files = files;
         this.storage = storage;
         this.excel = excel;
+        this.csv = csv;
         this.workflows = workflows;
         this.mapper = mapper;
     }
 
-    @AgentTool(name = "inspect_workflow_inputs", description = "Inspect the trusted task workbooks and their worksheet schemas before applying a workflow.", permission = "excel:inspect_workflow_inputs", timeoutMs = 30000)
+    @AgentTool(name = "inspect_workflow_inputs", description = "Inspect the trusted Excel or CSV task inputs and their sheet schemas before applying a workflow.", permission = "excel:inspect_workflow_inputs", timeoutMs = 30000)
     public Map<String, Object> inspectInputs() {
         Long uid = number("userId"), taskId = number("taskId");
         List<Map<String, Object>> inspected = new ArrayList<>();
@@ -52,7 +55,7 @@ public class ExcelWorkflowTools {
         return Map.of("workflowType", contextWorkflow(), "inputs", inspected);
     }
 
-    @AgentTool(name = "merge_clean_workbooks", description = "Merge and clean the selected trusted workbooks using only the confirmed task options.", permission = "excel:merge_clean_workbooks", timeoutMs = 60000)
+    @AgentTool(name = "merge_clean_workbooks", description = "Merge and clean the selected trusted workbook or CSV tables using only confirmed task options.", permission = "excel:merge_clean_workbooks", timeoutMs = 60000)
     public Map<String, Object> mergeClean() {
         requireWorkflow("MERGE_CLEAN");
         requireInspected();
@@ -67,17 +70,12 @@ public class ExcelWorkflowTools {
             ExcelWorkbook.Sheet sheet = chooseSheet(workbook, selectedSheets.size() > i ? String.valueOf(selectedSheets.get(i)) : null);
             inputs.add(new SheetInput(file.id(), sheet.name(), sheet.headers(), sheet.rows()));
         }
-        Map<String, List<String>> aliases = stringListMap(options.get("headerAliases"));
-        List<String> duplicateKeys = strings(options.get("duplicateKeyColumns"));
-        Map<String, String> dateFormats = stringMap(options.get("dateFormats"));
-        Set<String> amounts = new LinkedHashSet<>(strings(options.get("amountColumns")));
-        WorkflowResult result = workflows.mergeAndClean(inputs, new MergeOptions(aliases, duplicateKeys,
-                !Boolean.FALSE.equals(options.get("skipBlankRows")), dateFormats, amounts));
+        WorkflowResult result = workflows.mergeAndClean(inputs, MergeOptionsParser.parse(options));
         data.setWorkflowResult(number("taskId"), result);
         return resultSummary(result);
     }
 
-    @AgentTool(name = "reconcile_workbooks", description = "Reconcile exactly two trusted workbooks with the confirmed keys, fields, and tolerance.", permission = "excel:reconcile_workbooks", timeoutMs = 60000)
+    @AgentTool(name = "reconcile_workbooks", description = "Reconcile exactly two trusted workbook or CSV inputs with the confirmed keys, fields, and tolerance.", permission = "excel:reconcile_workbooks", timeoutMs = 60000)
     public Map<String, Object> reconcile() {
         requireWorkflow("RECONCILE");
         requireInspected();
@@ -95,7 +93,7 @@ public class ExcelWorkflowTools {
         return resultSummary(result);
     }
 
-    @AgentTool(name = "summarize_workbook", description = "Build a deterministic grouped summary from the trusted workbook and confirmed options.", permission = "excel:summarize_workbook", timeoutMs = 60000)
+    @AgentTool(name = "summarize_workbook", description = "Build a deterministic grouped summary from the trusted workbook or CSV table and confirmed options.", permission = "excel:summarize_workbook", timeoutMs = 60000)
     public Map<String, Object> summarize() {
         requireWorkflow("SUMMARY");
         requireInspected();
@@ -111,18 +109,29 @@ public class ExcelWorkflowTools {
         return resultSummary(result);
     }
 
-    @AgentTool(name = "export_workbook_result", description = "Export the successful deterministic workflow result as a new workbook and persist its audit summary.", permission = "excel:export_workbook_result", timeoutMs = 30000)
+    @AgentTool(name = "export_workbook_result", description = "Export the successful deterministic result as the selected CSV or XLSX file and persist its audit summary.", permission = "excel:export_workbook_result", timeoutMs = 30000)
     public Map<String, Object> export() throws Exception {
         Long taskId = number("taskId"), userId = number("userId");
         if (data.result(taskId) != null) throw new IllegalStateException("Workflow result was already exported");
         WorkflowResult result = data.workflowResult(taskId);
         if (result == null) throw new IllegalStateException("Run the deterministic workflow successfully before export");
         String workflow = contextWorkflow();
-        String name = "ai-" + workflow.toLowerCase(Locale.ROOT) + "-result-" + taskId + ".xlsx";
+        String outputFormat = Objects.toString(options().get("outputFormat"), "XLSX").toUpperCase(Locale.ROOT);
+        boolean csvOutput = "CSV".equals(outputFormat);
+        if (!csvOutput && !"XLSX".equals(outputFormat)) throw new IllegalArgumentException("Unsupported workflow output format");
+        if (csvOutput && !Set.of("SUMMARY", "MERGE_CLEAN").contains(workflow))
+            throw new IllegalArgumentException("CSV output is supported only for summary and merge/cleanup workflows");
+        if (csvOutput && result.outputSheets().size() != 1)
+            throw new IllegalArgumentException("CSV output requires exactly one result worksheet");
+        String extension = csvOutput ? "csv" : "xlsx";
+        String name = "ai-" + workflow.toLowerCase(Locale.ROOT) + "-result-" + taskId + "." + extension;
         Path path = storage.savePathName(name);
-        excel.writeWorkbook(path, result.outputSheets());
+        if (csvOutput) csv.write(path, result.outputSheets().get(0));
+        else excel.writeWorkbook(path, result.outputSheets());
+        String contentType = csvOutput ? "text/csv; charset=UTF-8"
+                : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
         Long fileId = files.insert(userId, name, path.getFileName().toString(), path.toString(), Files.size(path),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "OUTPUT");
+                contentType, "OUTPUT");
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("workflowType", workflow);
         summary.put("operationDefinition", options());
@@ -198,12 +207,6 @@ public class ExcelWorkflowTools {
         if (!(value instanceof Map<?, ?> map)) return Map.of();
         Map<String, String> result = new LinkedHashMap<>();
         map.forEach((key, item) -> result.put(String.valueOf(key), String.valueOf(item)));
-        return result;
-    }
-    private Map<String, List<String>> stringListMap(Object value) {
-        if (!(value instanceof Map<?, ?> map)) return Map.of();
-        Map<String, List<String>> result = new LinkedHashMap<>();
-        map.forEach((key, item) -> result.put(String.valueOf(key), strings(item)));
         return result;
     }
     private BigDecimal decimal(Object value) { return value == null ? BigDecimal.ZERO : new BigDecimal(String.valueOf(value)); }
