@@ -84,6 +84,9 @@
     .workflow-option small, .workflow-help { color: var(--muted); font-size: 11px; line-height: 1.5; }
     .workflow-preview { margin-top: 14px; padding: 13px; background: var(--wash); border-radius: 10px; }
     .workflow-preview pre, .summary-content { max-height: 260px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.55 Consolas, monospace; }
+    .quality-review { margin: 12px 0; padding: 12px; background: white; border: 1px solid var(--line); border-radius: 9px; font-size: 12px; }
+    .quality-review ul { margin: 8px 0 0; padding-left: 20px; line-height: 1.6; }
+    .quality-review p { margin: 8px 0 0; color: var(--muted); }
     .source-map-row { display: grid; grid-template-columns: minmax(100px, 1fr) 22px minmax(100px, 1fr); align-items: center; gap: 8px; }
     .check-option { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 12px; }
     .submit-row { display: flex; align-items: center; gap: 12px; margin-top: 17px; }
@@ -103,6 +106,20 @@
     .result-top strong { font-size: 13px; }
     .result-error { margin-top: 8px; color: var(--red); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
     .result .secondary { margin-top: 12px; }
+    .history-panel { margin-top: 18px; }
+    .history-filters, .history-actions, .history-pagination { display: flex; flex-wrap: wrap; gap: 9px; align-items: end; }
+    .history-filters .field { flex: 1 1 135px; margin: 0; }
+    .history-filters input, .history-filters select { min-height: 39px; padding: 9px 10px; }
+    .history-list { display: grid; gap: 10px; }
+    .history-item { padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: white; }
+    .history-item p { margin: 6px 0; color: var(--muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+    .history-item summary { color: var(--green-dark); cursor: pointer; font-size: 11px; }
+    .history-item pre { max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.5 Consolas, monospace; }
+    .history-pagination { justify-content: space-between; }
+    .row-review-panel { display: grid; gap: 12px; margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: white; }
+    .row-review-item { padding: 12px; border: 1px solid var(--line); border-radius: 9px; }
+    .row-review-item pre { overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.5 Consolas, monospace; }
+    .row-review-corrections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
     footer { margin-top: 30px; color: #87948d; font-size: 11px; text-align: center; }
     [hidden] { display: none !important; }
     @media (max-width: 760px) {
@@ -167,8 +184,15 @@
             <button class="secondary" id="logoutButton" type="button">退出登录</button>
           </div>
           <h2 id="workTitle">处理一个表格</h2>
-          <p class="card-sub">选择 Excel 文件和业务工作流 / Choose workbooks and a business workflow.</p>
+          <p class="card-sub">选择 Excel 或 CSV 文件和业务工作流 / Choose Excel or CSV files and a business workflow.</p>
           <form id="taskForm">
+            <div class="field">
+              <label for="workflowTemplate">快速模板 / Quick template</label>
+              <select id="workflowTemplate" name="workflowTemplate">
+                <option value="">不使用模板 / No template</option>
+              </select>
+              <small id="workflowTemplateHelp">可选模板只填入明确匹配的字段，所有规则仍可编辑。 / Templates fill only clearly matched fields; every rule remains editable.</small>
+            </div>
             <div class="field">
               <label for="workflowType">处理模式 / Workflow</label>
               <select id="workflowType" name="workflowType">
@@ -180,12 +204,21 @@
             </div>
             <div class="upload-box">
               <div class="upload-icon" aria-hidden="true">↥</div>
-              <div class="upload-copy"><strong id="fileName">还没有选择文件</strong><span>仅支持有效的 .xlsx 工作簿 · 工作流按场景选择 1 或多份 / Valid .xlsx workbooks only · Select 1+ files for the chosen workflow</span></div>
-              <input class="file-input" id="fileInput" type="file" accept=".xlsx" required multiple aria-label="选择 Excel 文件">
+              <div class="upload-copy"><strong id="fileName">还没有选择文件</strong><span>支持有效的 .xlsx 工作簿和 .csv 表格 · 工作流按场景选择 1 或多份 / Valid .xlsx workbooks and .csv tables · Select 1+ files for the chosen workflow</span></div>
+              <input class="file-input" id="fileInput" type="file" accept=".xlsx,.csv" required multiple aria-label="选择 Excel 或 CSV 文件">
             </div>
             <div id="workflowOptionsPanel" class="workflow-options" hidden>
               <h3>工作流选项 / Workflow options</h3>
               <p class="workflow-help" id="workflowHelp">先选择工作表并填写映射 / Select worksheets and provide explicit mappings.</p>
+              <div class="quality-review" id="schemaDriftPanel" hidden></div>
+              <div class="workflow-option" id="workflowOutputFormatPanel" hidden>
+                <label for="workflowOutputFormat">结果文件格式 / Result format</label>
+                <select id="workflowOutputFormat">
+                  <option value="XLSX">Excel 工作簿（默认） / Excel workbook (default)</option>
+                  <option value="CSV">CSV 表格 / CSV table</option>
+                </select>
+                <small>CSV 输出适用于汇总和合并清洗；对账及自由处理使用 XLSX。 / CSV output is available for summary and merge/cleanup; reconciliation and freeform use XLSX.</small>
+              </div>
               <div id="workflowConfig" class="workflow-option-grid"></div>
               <div id="workflowSourceMap" class="workflow-option-grid"></div>
             </div>
@@ -204,6 +237,7 @@
           <div class="workflow-preview" id="workflowReview" hidden>
             <strong>执行前预览 / Review before run</strong>
             <pre id="workflowReviewContent"></pre>
+            <div class="quality-review" id="qualityReview" hidden></div>
             <button class="primary wide" id="confirmWorkflowButton" type="button" hidden>确认并运行 / Confirm &amp; run</button>
           </div>
           <div class="result" id="resultPanel" aria-live="polite">
@@ -212,6 +246,24 @@
             <details id="resultSummaryPanel" hidden><summary>处理摘要与异常 / Summary &amp; exceptions</summary><pre class="summary-content" id="resultSummary"></pre></details>
             <button class="secondary" id="downloadButton" type="button" hidden>下载处理结果</button>
           </div>
+          <section class="workflow-options history-panel" aria-labelledby="historyTitle">
+            <h3 id="historyTitle">任务历史 / Task history</h3>
+            <div class="history-filters">
+              <div class="field"><label for="historyStatus">状态 / Status</label><select id="historyStatus"><option value="">全部 / All</option><option value="QUEUED">排队中 / Queued</option><option value="RUNNING">处理中 / Running</option><option value="COMPLETED">已完成 / Completed</option><option value="FAILED">失败 / Failed</option></select></div>
+              <div class="field"><label for="historyWorkflow">工作流 / Workflow</label><select id="historyWorkflow"><option value="">全部 / All</option><option value="FREEFORM">自由处理 / Freeform</option><option value="MERGE_CLEAN">合并清洗 / Merge &amp; clean</option><option value="RECONCILE">两表对账 / Reconcile</option><option value="SUMMARY">汇总 / Summary</option></select></div>
+              <div class="field"><label for="historyFromDate">开始日期 / From</label><input id="historyFromDate" type="date"></div>
+              <div class="field"><label for="historyToDate">结束日期 / To</label><input id="historyToDate" type="date"></div>
+              <button class="secondary" id="refreshHistoryButton" type="button">刷新 / Refresh</button>
+            </div>
+            <div class="history-list" id="taskHistoryList" aria-live="polite"><p class="workflow-help">正在加载任务 / Loading tasks.</p></div>
+            <div class="history-pagination"><span class="workflow-help" id="historyPageLabel"></span><div class="history-actions"><button class="secondary" id="historyPrevButton" type="button" disabled>上一页 / Previous</button><button class="secondary" id="historyNextButton" type="button" disabled>下一页 / Next</button></div></div>
+            <section class="row-review-panel" id="rowReviewPanel" aria-live="polite" hidden>
+              <div><strong id="rowReviewTitle">逐行异常复核 / Row review</strong><p class="workflow-help" id="rowReviewStatus"></p></div>
+              <div class="history-actions"><button class="secondary" id="rowReviewOriginal" type="button">下载原结果 / Original</button><button class="secondary" id="rowReviewRevised" type="button" hidden>下载修订结果 / Revised</button></div>
+              <div id="rowReviewItems"></div>
+              <div class="history-pagination"><span class="workflow-help" id="rowReviewPageLabel"></span><div class="history-actions"><button class="secondary" id="rowReviewPrev" type="button">上一页 / Previous</button><button class="secondary" id="rowReviewNext" type="button">下一页 / Next</button><button class="primary" id="rowReviewSubmit" type="button">生成修订结果 / Create revision</button></div></div>
+            </section>
+          </section>
         </section>
 
         <aside class="card side-card">
@@ -231,7 +283,9 @@
 
   <!-- 中文：登录后由本脚本串起上传、任务轮询与结果下载；页面不直接访问 LLM 或工具服务。
        English: This script connects login, upload, polling, and download; the browser never calls the LLM or tool service directly. -->
-  <script>
+  <script type="module">
+    import { compareSchemaSnapshots, getWorkflowTemplate, getWorkflowTemplates, restoreWorkflowHeaderMappings, suggestWorkflowTemplateFields } from './workflow-templates.mjs';
+    import { buildDecisionSnapshot, groupIssues, restoreDecisions, rowKey } from './row-review.mjs';
     (() => {
       const $ = (id) => document.getElementById(id);
       const authCard = $('authCard');
@@ -240,14 +294,32 @@
       const taskMessage = $('taskMessage');
       const resultPanel = $('resultPanel');
       const workflowSelect = $('workflowType');
+      const templateSelect = $('workflowTemplate');
+      let activeTemplateId = '';
+      let pendingHistorySnapshot = null;
+      let pendingHistoryOptions = null;
+      let replayingHistory = false;
+      let historyPage = 0;
+      let historyTotal = 0;
+      let activeReview = null;
+      let reviewItems = [];
+      let reviewControls = new Map();
+      let reviewPage = 0;
       let mode = 'login';
       let token = sessionStorage.getItem('excel-ai-token') || '';
       let resultFileId = 0;
+      let resultFileExtension = 'xlsx';
       let workflowFileIds = [];
       let workflowInputPreview = null;
       let workflowFingerprint = '';
       let reviewedWorkflowRequest = null;
       $('apiOrigin').textContent = window.location.origin;
+      for (const template of getWorkflowTemplates()) {
+        const option = document.createElement('option');
+        option.value = template.id;
+        option.textContent = template.label;
+        templateSelect.append(option);
+      }
 
       function showMessage(element, message, type = 'info') {
         element.textContent = message;
@@ -267,7 +339,9 @@
         const body = type.includes('application/json') ? await response.json() : await response.text();
         if (!response.ok) {
           const detail = body && typeof body === 'object' ? (body.message || body.error) : body;
-          throw new Error(detail || `请求失败（HTTP ${response.status}）`);
+          const error = new Error(detail || `请求失败（HTTP ${response.status}）`);
+          error.status = response.status;
+          throw error;
         }
         return body;
       }
@@ -286,12 +360,14 @@
       function showWorkspace() {
         authCard.classList.add('hide');
         workspace.classList.add('show');
+        loadTaskHistory();
       }
       function signOut() {
         token = '';
         sessionStorage.removeItem('excel-ai-token');
         workspace.classList.remove('show');
         authCard.classList.remove('hide');
+        $('taskHistoryList').replaceChildren();
         setMode('login');
       }
       function isTypedWorkflow() { return workflowSelect.value !== 'FREEFORM'; }
@@ -424,7 +500,91 @@
           $('workflowConfig').append(wrapper);
           select.addEventListener('change', () => { clearReview(); renderOperationFields(); });
         });
+        const savedSheets = historySheetNames(pendingHistoryOptions, workflowSelect.value);
+        savedSheets.forEach((name, index) => {
+          const select = $(`sheet-${index}`);
+          if (select && Array.from(select.options).some((option) => option.value === name)) select.value = name;
+        });
         renderOperationFields();
+      }
+      function historySheetNames(options, type) {
+        if (!options) return [];
+        if (type === 'MERGE_CLEAN') return options.sheetNames || [];
+        if (type === 'RECONCILE') return [options.leftSheetName, options.rightSheetName];
+        if (type === 'SUMMARY') return [options.sheetName];
+        return [];
+      }
+      function applyHistoryWorkflowOptions(options) {
+        if (!options) return;
+        const setValue = (id, value) => {
+          const control = $(id);
+          if (!control || value == null) return;
+          const values = Array.isArray(value) ? value : [value];
+          if (control.type === 'checkbox') control.checked = Boolean(values[0]);
+          else if (control.multiple) {
+            const selected = new Set(values.map(String));
+            for (const option of control.options) option.selected = selected.has(option.value);
+          } else if (Array.from(control.options || []).some((option) => option.value === String(values[0]))) {
+            control.value = String(values[0]);
+          } else if (control.tagName === 'INPUT') control.value = String(values[0]);
+        };
+        if (workflowSelect.value === 'SUMMARY') {
+          setValue('workflowOutputFormat', options.outputFormat || 'XLSX');
+          setValue('summary-measure', options.measureColumn);
+          setValue('summary-dimensions', options.dimensionColumns || []);
+          setValue('summary-aggregation', options.aggregation);
+          setValue('summary-date-column', options.dateColumn);
+          setValue('summary-date-period', options.datePeriod);
+          setValue('summary-date-format', options.dateFormat);
+        } else if (workflowSelect.value === 'RECONCILE') {
+          for (let index = 0; index < 3; index += 1) {
+            setValue(`reconcile-left-key-${index}`, options.leftKeyMappings?.[`key${index + 1}`]);
+            setValue(`reconcile-right-key-${index}`, options.rightKeyMappings?.[`key${index + 1}`]);
+            setValue(`reconcile-left-value-${index}`, options.leftValueMappings?.[`value${index + 1}`]);
+            setValue(`reconcile-right-value-${index}`, options.rightValueMappings?.[`value${index + 1}`]);
+          }
+          setValue('reconcile-tolerance', options.tolerance);
+        } else if (workflowSelect.value === 'MERGE_CLEAN') {
+          setValue('workflowOutputFormat', options.outputFormat || 'XLSX');
+          setValue('merge-keys', options.duplicateKeyColumns || []);
+          setValue('merge-amounts', options.amountColumns || []);
+          const dateColumn = Object.keys(options.dateFormats || {})[0];
+          setValue('merge-date', dateColumn || '');
+          setValue('merge-date-format', dateColumn ? options.dateFormats[dateColumn] : 'yyyy-MM-dd');
+          setValue('merge-skip-blank', options.skipBlankRows !== false);
+        }
+      }
+      function applyWorkflowTemplateDefaults(suggestions) {
+        const controls = {
+          measureColumn: 'summary-measure',
+          dimensionColumn: 'summary-dimensions',
+          aggregation: 'summary-aggregation',
+          dateColumn: 'summary-date-column',
+          period: 'summary-date-period',
+          leftKey: 'reconcile-left-key-0',
+          rightKey: 'reconcile-right-key-0',
+          leftAmount: 'reconcile-left-value-0',
+          rightAmount: 'reconcile-right-value-0',
+          tolerance: 'reconcile-tolerance',
+          keyFields: 'merge-keys',
+          amountFields: 'merge-amounts',
+          dateFields: 'merge-date',
+          skipBlank: 'merge-skip-blank',
+        };
+        for (const [key, id] of Object.entries(controls)) {
+          const control = $(id);
+          const value = suggestions[key];
+          if (!control || value === undefined) continue;
+          if (control.type === 'checkbox') control.checked = Boolean(value);
+          else if (control.multiple) {
+            const selected = new Set(value);
+            for (const option of control.options) option.selected = selected.has(option.value);
+          } else if (Array.from(control.options || []).some((option) => option.value === String(value))) {
+            control.value = String(value);
+          } else if (control.tagName === 'INPUT') control.value = String(value);
+        }
+        const dateFormat = $('summary-date-format');
+        if (suggestions.outputFormat === 'date' && dateFormat) dateFormat.value = 'yyyy-MM-dd';
       }
       function renderOperationFields() {
         $('workflowSourceMap').replaceChildren();
@@ -432,10 +592,21 @@
         // 中文：按完整字段容器清理旧控件，避免切换工作表后留下空容器。
         // English: Remove each full field wrapper to avoid empty containers after worksheet changes.
         for (const old of Array.from(config.querySelectorAll('[data-operation-field="true"]'))) old.closest('.workflow-option')?.remove();
+        const type = workflowSelect.value;
+        const outputFormatPanel = $('workflowOutputFormatPanel');
+        outputFormatPanel.hidden = type !== 'SUMMARY' && type !== 'MERGE_CLEAN';
+        if (outputFormatPanel.hidden) $('workflowOutputFormat').value = 'XLSX';
+        else if (pendingHistoryOptions?.outputFormat) $('workflowOutputFormat').value = pendingHistoryOptions.outputFormat;
         let schemas;
         try { schemas = getSelectedSchemas(); }
-        catch { $('workflowHelp').textContent = '先明确选择所有工作表。 / Select every worksheet first.'; return; }
-        const type = workflowSelect.value;
+        catch {
+          $('schemaDriftPanel').replaceChildren();
+          $('schemaDriftPanel').hidden = true;
+          $('workflowHelp').textContent = '先明确选择所有工作表。 / Select every worksheet first.';
+          return;
+        }
+        renderSchemaDrift(schemas);
+        const templateDefaults = suggestWorkflowTemplateFields(activeTemplateId, schemas);
         if (type === 'MERGE_CLEAN') {
           $('workflowHelp').textContent = '将同义来源表头映射到同一个输出字段；重复/空表头仍会作为冲突报告。 / Map equivalent source headers to one output field; duplicate or blank headers remain visible as conflicts.';
           const headers = [...new Set(schemas.flatMap((sheet) => sheet.headers).filter((header) => header.trim()))];
@@ -450,13 +621,16 @@
             const target = document.createElement('input');
             target.type = 'text';
             target.id = `merge-map-${index}`;
-            target.value = header;
+            const suggested = templateDefaults.headerTargets?.find((item) => item.header === header);
+            const savedTargets = Object.entries(pendingHistoryOptions?.headerAliases || {})
+              .filter(([, sources]) => Array.isArray(sources) && sources.includes(header)).map(([name]) => name);
+            target.value = savedTargets.length === 1 ? savedTargets[0] : (suggested?.target || header);
             target.dataset.sourceHeader = header;
             target.setAttribute('aria-label', `${header} 的输出字段 / output field for ${header}`);
             row.append(source, arrow, target);
             $('workflowSourceMap').append(row);
           });
-          const targets = [...new Set(headers)];
+          const targets = [...new Set(Array.from($('workflowSourceMap').querySelectorAll('input[data-source-header]')).map((input) => input.value.trim()).filter(Boolean))];
           const keys = selectField(config, 'merge-keys', '去重键 / Duplicate keys', targets, true);
           keys.dataset.operationField = 'true';
           const amount = selectField(config, 'merge-amounts', '金额列 / Amount columns', targets, true);
@@ -500,6 +674,88 @@
           selectField(config, 'summary-date-period', '日期周期 / Date period', ['DAY', 'MONTH', 'QUARTER', 'YEAR'], false, true).dataset.operationField = 'true';
           field(config, 'summary-date-format', '日期格式 / Date format', 'text', 'yyyy-MM-dd').dataset.operationField = 'true';
         }
+        applyWorkflowTemplateDefaults(templateDefaults);
+        if (pendingHistoryOptions) {
+          applyHistoryWorkflowOptions(restoreWorkflowHeaderMappings(pendingHistoryOptions, type, schemas));
+          pendingHistoryOptions = null;
+        }
+      }
+      function columnLabel(index) {
+        let value = index;
+        let label = '';
+        while (value > 0) {
+          value -= 1;
+          label = String.fromCharCode(65 + (value % 26)) + label;
+          value = Math.floor(value / 26);
+        }
+        return label;
+      }
+      function renderQualityReport(reports) {
+        const panel = $('qualityReview');
+        panel.replaceChildren();
+        const sheets = (reports || []).flatMap((file) => (file.sheets || []).map((sheet) => ({ fileName: file.fileName, ...sheet })));
+        const findings = sheets.flatMap((sheet) => (sheet.findings || []).map((finding) => ({ sheet, finding })));
+        panel.hidden = sheets.length === 0;
+        if (panel.hidden) return;
+        const title = document.createElement('strong');
+        title.textContent = '数据质量提示 / Data quality checks';
+        panel.append(title);
+        if (findings.length === 0) {
+          const clean = document.createElement('p');
+          clean.textContent = '所选工作表未发现当前检查项中的问题。 / No issues were found by these checks in the selected worksheets.';
+          panel.append(clean);
+          return;
+        }
+        const list = document.createElement('ul');
+        const labels = {
+          DUPLICATE_HEADERS: '重复表头 / Duplicate headers',
+          EMPTY_CELLS: '空单元格 / Empty cells',
+          DUPLICATE_ROWS: '重复行 / Duplicate rows',
+          INCONSISTENT_DATE_VALUES: '日期格式不一致 / Inconsistent date values',
+          INCONSISTENT_AMOUNT_VALUES: '金额格式不一致 / Inconsistent amount values',
+        };
+        for (const { sheet, finding } of findings) {
+          const item = document.createElement('li');
+          const columns = (finding.columns || []).map(columnLabel).join(', ');
+          const rows = (finding.sampleRows || []).join(', ');
+          const location = [sheet.fileName, sheet.name].filter(Boolean).join(' · ');
+          item.textContent = `${location} · ${labels[finding.code] || finding.code}: ${finding.count} · ${columns ? `列 ${columns} · ` : ''}${rows ? `示例行 ${rows}` : ''}`;
+          list.append(item);
+        }
+        panel.append(list);
+        const note = document.createElement('p');
+        note.textContent = '这些提示不会修改数据，也不会阻止运行；单元格内容不会显示在此报告中。 / These warnings do not change data or block execution; cell values are not shown.';
+        panel.append(note);
+      }
+      function renderSchemaDrift(schemas) {
+        const panel = $('schemaDriftPanel');
+        panel.replaceChildren();
+        const changes = compareSchemaSnapshots(pendingHistorySnapshot, schemas);
+        const findings = changes.flatMap((input) => {
+          const file = workflowInputPreview?.inputFiles?.[input.inputIndex];
+          const location = file?.name || `文件 ${input.inputIndex + 1} / File ${input.inputIndex + 1}`;
+          return [
+            ...(input.inputRemoved ? [`历史输入文件已移除 / Previous input at position ${input.inputIndex + 1} was removed`] : []),
+            ...input.sheetChanges.map((change) => `${location} · 工作表改名 / Worksheet renamed: ${change.from || '—'} → ${change.to || '—'}`),
+            ...input.missingHeaders.map((header) => `${location} · 缺失列 / Missing column: ${header}`),
+            ...input.addedHeaders.map((header) => `${location} · 新增列 / Added column: ${header}`),
+            ...input.possibleRenames.map((change) => `${location} · 可能改名 / Possible rename: ${change.from} → ${change.to}（请确认 / confirm）`),
+            ...input.ambiguousRenames.map((change) => `${location} · 需确认的候选 / Ambiguous candidates for ${change.from}: ${change.candidates.join(', ')}`),
+          ];
+        });
+        panel.hidden = findings.length === 0;
+        if (panel.hidden) return;
+        const title = document.createElement('strong');
+        title.textContent = '与历史任务的表头变化 / Header changes from previous task';
+        const list = document.createElement('ul');
+        for (const finding of findings) {
+          const item = document.createElement('li');
+          item.textContent = finding;
+          list.append(item);
+        }
+        const note = document.createElement('p');
+        note.textContent = '这些提示仅供参考，不会自动修改映射或阻止运行；不会读取或显示单元格内容。 / These hints are advisory; they do not change mappings or block execution, and no cell values are read or shown.';
+        panel.append(title, list, note);
       }
       function buildWorkflowOptions() {
         const sheets = selectedSheetNames();
@@ -515,8 +771,8 @@
             if (!aliases[target].includes(source)) aliases[target].push(source);
           }
           const dateColumn = $('merge-date').value;
-          return { sheetNames: sheets, headerAliases: aliases, duplicateKeyColumns: chosenValues('merge-keys'), skipBlankRows: $('merge-skip-blank').checked,
-            dateFormats: dateColumn ? { [dateColumn]: $('merge-date-format').value.trim() || 'yyyy-MM-dd' } : {}, amountColumns: chosenValues('merge-amounts') };
+          return { outputFormat: $('workflowOutputFormat').value, sheetNames: sheets, headerAliases: aliases, duplicateKeyColumns: chosenValues('merge-keys'), skipBlankRows: $('merge-skip-blank').checked,
+            dateFormats: dateColumn ? { [dateColumn]: $('merge-date-format').value.trim() || 'yyyy-MM-dd' } : {}, amountColumns: chosenValues('merge-amounts'), ...(activeTemplateId ? { workflowTemplateId: activeTemplateId } : {}) };
         }
         if (workflowSelect.value === 'RECONCILE') {
           const leftKeys = {}, rightKeys = {}, leftValues = {}, rightValues = {};
@@ -531,16 +787,16 @@
             if (Boolean(leftValue) !== Boolean(rightValue)) throw new Error('数值字段必须左右成对选择。 / Choose value columns in left/right pairs.');
             if (leftValue && rightValue) { leftValues[`value${index + 1}`] = leftValue; rightValues[`value${index + 1}`] = rightValue; }
           }
-          return { leftSheetName: sheets[0], rightSheetName: sheets[1], leftKeyMappings: leftKeys, rightKeyMappings: rightKeys,
-            leftValueMappings: leftValues, rightValueMappings: rightValues, tolerance: $('reconcile-tolerance').value || '0' };
+          return { outputFormat: 'XLSX', leftSheetName: sheets[0], rightSheetName: sheets[1], leftKeyMappings: leftKeys, rightKeyMappings: rightKeys,
+            leftValueMappings: leftValues, rightValueMappings: rightValues, tolerance: $('reconcile-tolerance').value || '0', ...(activeTemplateId ? { workflowTemplateId: activeTemplateId } : {}) };
         }
         const measureColumn = $('summary-measure').value;
         if (!measureColumn) throw new Error('请选择统计字段。 / Select a measure column.');
         const dateColumn = $('summary-date-column').value;
         const datePeriod = $('summary-date-period').value;
         if (Boolean(dateColumn) !== Boolean(datePeriod)) throw new Error('日期列和日期周期必须同时设置。 / Set both date column and period, or neither.');
-        return { sheetName: sheets[0], measureColumn, dimensionColumns: chosenValues('summary-dimensions'), aggregation: $('summary-aggregation').value,
-          dateColumn: dateColumn || null, datePeriod: datePeriod || null, dateFormat: $('summary-date-format').value.trim() || 'yyyy-MM-dd' };
+        return { outputFormat: $('workflowOutputFormat').value, sheetName: sheets[0], measureColumn, dimensionColumns: chosenValues('summary-dimensions'), aggregation: $('summary-aggregation').value,
+          dateColumn: dateColumn || null, datePeriod: datePeriod || null, dateFormat: $('summary-date-format').value.trim() || 'yyyy-MM-dd', ...(activeTemplateId ? { workflowTemplateId: activeTemplateId } : {}) };
       }
       function setMode(nextMode) {
         mode = nextMode;
@@ -554,19 +810,47 @@
         $('password').autocomplete = isLogin ? 'current-password' : 'new-password';
         clearMessage(authMessage);
       }
-      function showWorkspace() { authCard.classList.add('hide'); workspace.classList.add('show'); }
+      function showWorkspace() { authCard.classList.add('hide'); workspace.classList.add('show'); loadTaskHistory(); }
       function signOut() {
         token = '';
         sessionStorage.removeItem('excel-ai-token');
         workspace.classList.remove('show');
         authCard.classList.remove('hide');
+        $('taskHistoryList').replaceChildren();
         setMode('login');
       }
 
       $('loginTab').addEventListener('click', () => setMode('login'));
       $('registerTab').addEventListener('click', () => setMode('register'));
       $('logoutButton').addEventListener('click', signOut);
-      workflowSelect.addEventListener('change', updateWorkflowMode);
+      $('refreshHistoryButton').addEventListener('click', () => { historyPage = 0; loadTaskHistory(); });
+      for (const id of ['historyStatus', 'historyWorkflow', 'historyFromDate', 'historyToDate']) {
+        $(id).addEventListener('change', () => { historyPage = 0; loadTaskHistory(); });
+      }
+      $('historyPrevButton').addEventListener('click', () => { if (historyPage > 0) { historyPage -= 1; loadTaskHistory(); } });
+      $('historyNextButton').addEventListener('click', () => { if ((historyPage + 1) * 10 < historyTotal) { historyPage += 1; loadTaskHistory(); } });
+      workflowSelect.addEventListener('change', () => {
+        activeTemplateId = '';
+        templateSelect.value = '';
+        if (!replayingHistory) {
+          pendingHistoryOptions = null;
+          pendingHistorySnapshot = null;
+        }
+        $('workflowTemplateHelp').textContent = '可选模板只填入明确匹配的字段，所有规则仍可编辑。 / Templates fill only clearly matched fields; every rule remains editable.';
+        updateWorkflowMode();
+      });
+      templateSelect.addEventListener('change', () => {
+        pendingHistoryOptions = null;
+        pendingHistorySnapshot = null;
+        const template = getWorkflowTemplate(templateSelect.value);
+        activeTemplateId = template?.id || '';
+        $('workflowTemplateHelp').textContent = template?.description || '可选模板只填入明确匹配的字段，所有规则仍可编辑。 / Templates fill only clearly matched fields; every rule remains editable.';
+        if (template) {
+          workflowSelect.value = template.workflowType;
+          $('prompt').value = template.prompt;
+        }
+        updateWorkflowMode();
+      });
       $('fileInput').addEventListener('change', () => {
         const files = selectedFiles();
         $('fileName').textContent = files.map((file) => file.name).join('、') || '还没有选择文件';
@@ -593,6 +877,222 @@
         } finally { submit.disabled = false; }
       });
 
+      function renderTaskHistory(items) {
+        const list = $('taskHistoryList');
+        list.replaceChildren();
+        if (!items.length) {
+          const empty = document.createElement('p');
+          empty.className = 'workflow-help';
+          empty.textContent = '没有符合条件的任务。 / No tasks match these filters.';
+          list.append(empty);
+          return;
+        }
+        const workflowLabels = { FREEFORM: '自由处理 / Freeform', MERGE_CLEAN: '合并清洗 / Merge & clean', RECONCILE: '两表对账 / Reconcile', SUMMARY: '汇总 / Summary' };
+        for (const task of items) {
+          const card = document.createElement('article');
+          card.className = 'history-item';
+          const title = document.createElement('strong');
+          title.textContent = `任务 #${task.taskId} · ${workflowLabels[task.workflowType] || task.workflowType} · ${task.status}`;
+          const time = document.createElement('p');
+          time.textContent = `${task.createdAt ? new Date(task.createdAt).toLocaleString() : ''} · ${task.progress}%`;
+          const files = document.createElement('p');
+          files.textContent = `输入文件 / Inputs: ${(task.inputFiles || []).map((file) => file.name).join('、') || '无 / none'}`;
+          const actions = document.createElement('div');
+          actions.className = 'history-actions';
+          if (task.resultFileId) {
+            const download = document.createElement('button');
+            download.className = 'secondary';
+            download.type = 'button';
+            download.textContent = '下载结果 / Download result';
+            download.addEventListener('click', async () => {
+              try {
+                const extension = String(task.workflowOptions?.outputFormat || 'XLSX').toLowerCase() === 'csv' ? 'csv' : 'xlsx';
+                await downloadFile(task.resultFileId, `excel-ai-task-${task.taskId}.${extension}`);
+              }
+              catch (error) { showMessage(taskMessage, error.message || '下载失败。 / Download failed.', 'error'); }
+            });
+            actions.append(download);
+          }
+          if (task.status === 'COMPLETED' && task.workflowType === 'MERGE_CLEAN' && task.resultFileId) {
+            const review = document.createElement('button');
+            review.className = 'secondary';
+            review.type = 'button';
+            review.textContent = '逐行复核异常 / Review rows';
+            review.addEventListener('click', async () => {
+              try { await openRowReview(task); }
+              catch (error) { showMessage(taskMessage, error.message || '无法加载逐行复核。 / Could not load row review.', 'error'); }
+            });
+            actions.append(review);
+          }
+          const reuse = document.createElement('button');
+          reuse.className = 'secondary';
+          reuse.type = 'button';
+          reuse.textContent = '换新文件复用规则 / Reuse rules with new files';
+          reuse.addEventListener('click', () => reuseTaskRules(task));
+          actions.append(reuse);
+          card.append(title, time, files);
+          if (task.error) {
+            const error = document.createElement('p');
+            error.textContent = `错误 / Error: ${task.error}`;
+            card.append(error);
+          }
+          if (Object.keys(task.resultSummary || {}).length) {
+            const details = document.createElement('details');
+            const summary = document.createElement('summary');
+            summary.textContent = '查看结果摘要 / Show result summary';
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(task.resultSummary, null, 2);
+            details.append(summary, pre);
+            card.append(details);
+          }
+          card.append(actions);
+          list.append(card);
+        }
+      }
+      async function openRowReview(task) {
+        activeReview = task;
+        reviewPage = 0;
+        reviewControls = new Map();
+        $('rowReviewPanel').hidden = false;
+        $('rowReviewTitle').textContent = `任务 #${task.taskId} · 逐行异常复核 / Row review`;
+        $('rowReviewStatus').textContent = '正在读取异常行… / Loading exception rows…';
+        const extension = String(task.workflowOptions?.outputFormat || 'XLSX').toLowerCase() === 'csv' ? 'csv' : 'xlsx';
+        $('rowReviewOriginal').onclick = async () => downloadFile(task.resultFileId, `excel-ai-task-${task.taskId}-original.${extension}`);
+        $('rowReviewRevised').hidden = !task.resultSummary?.review?.revisedFileId;
+        $('rowReviewRevised').onclick = async () => downloadFile(activeReview.revisedFileId, `excel-ai-task-${task.taskId}-revised.${extension}`);
+        await loadRowReviewPage();
+        $('rowReviewPanel').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+      async function loadRowReviewPage() {
+        const result = await request(`/api/tasks/${activeReview.taskId}/review?page=${reviewPage}&size=50`);
+        reviewItems = groupIssues(result.items || []);
+        activeReview.reviewTotal = result.total;
+        for (const [key, value] of restoreDecisions(reviewItems)) if (!reviewControls.has(key)) reviewControls.set(key, value);
+        activeReview.reviewVersion = result.version;
+        activeReview.originalFileId = result.originalFileId;
+        activeReview.revisedFileId = result.revisedFileId;
+        renderRowReview();
+      }
+      function renderRowReview() {
+        const host = $('rowReviewItems');
+        host.replaceChildren();
+        $('rowReviewStatus').textContent = reviewItems.length
+          ? `${reviewItems.length} 行当前页 · ${$('rowReviewPageLabel').textContent} / ${reviewItems.length} rows on this page`
+          : '没有可复核的行级异常。 / No row-level exceptions to review.';
+        for (const item of reviewItems) {
+          const card = document.createElement('article');
+          card.className = 'row-review-item';
+          const heading = document.createElement('strong');
+          heading.textContent = `${item.fileName} · ${item.sheetName} · 第 ${item.row.rowNumber} 行 / Row ${item.row.rowNumber}`;
+          const raw = document.createElement('pre');
+          raw.textContent = `原始 / Source: ${JSON.stringify(Object.fromEntries(item.sourceHeaders.map((header, index) => [header, item.sourceValues[index] ?? ''])), null, 2)}\n原结果 / Original: ${JSON.stringify(item.includedInOriginal ? Object.fromEntries(item.processedHeaders.map((header, index) => [header, item.processedValues[index] ?? ''])) : null, null, 2)}`;
+          const issueText = document.createElement('p');
+          issueText.textContent = item.issues.map((issue) => `${issue.code}${issue.column ? ` · ${issue.column}` : ''}${issue.value ? ` · ${issue.value}` : ''}`).join('；');
+          const control = reviewControls.get(item.key) || { row: item.row, action: '', corrections: {} };
+          const select = document.createElement('select');
+          for (const [value, label] of [['', '选择处理方式 / Choose action'], ['CORRECT', '修正 / Correct'], ['KEEP', '保留 / Keep'], ['SKIP', '跳过 / Skip']]) {
+            const option = document.createElement('option'); option.value = value; option.textContent = label; select.append(option);
+          }
+          select.value = control.action || '';
+          select.addEventListener('change', () => { control.action = select.value; reviewControls.set(item.key, control); });
+          const corrections = document.createElement('div');
+          corrections.className = 'row-review-corrections';
+          if (control.action === 'CORRECT') {
+            const fields = [...new Set(item.issues.filter((issue) => ['INVALID_DATE', 'INVALID_AMOUNT'].includes(issue.code)).map((issue) => issue.column))];
+            for (const field of fields) {
+              const label = document.createElement('label'); label.textContent = `修正 ${field} / Correct ${field}`;
+              const input = document.createElement('input'); input.type = 'text'; input.value = control.corrections?.[field] || '';
+              input.addEventListener('input', () => { control.corrections = { ...(control.corrections || {}), [field]: input.value }; reviewControls.set(item.key, control); });
+              label.append(input); corrections.append(label);
+            }
+          }
+          select.addEventListener('change', () => renderRowReview());
+          card.append(heading, raw, issueText, select, corrections);
+          host.append(card);
+        }
+        const pageCount = Math.max(1, Math.ceil((activeReview.reviewTotal || 0) / 50));
+        $('rowReviewPageLabel').textContent = `${reviewPage + 1}/${pageCount} · ${activeReview.reviewTotal || 0} 行 / rows`;
+        $('rowReviewPrev').disabled = reviewPage === 0;
+        $('rowReviewNext').disabled = reviewPage + 1 >= pageCount;
+        $('rowReviewSubmit').disabled = !activeReview.reviewTotal;
+        $('rowReviewRevised').hidden = !activeReview.revisedFileId;
+      }
+      $('rowReviewPrev').addEventListener('click', async () => { if (reviewPage > 0) { reviewPage--; await loadRowReviewPage(); } });
+      $('rowReviewNext').addEventListener('click', async () => { reviewPage++; await loadRowReviewPage(); });
+      $('rowReviewSubmit').addEventListener('click', async () => {
+        const button = $('rowReviewSubmit'); button.disabled = true;
+        try {
+          const first = await request(`/api/tasks/${activeReview.taskId}/review?page=0&size=50`);
+          const allItems = [...(first.items || [])];
+          const pages = Math.ceil(first.total / 50);
+          for (let page = 1; page < pages; page++) {
+            const next = await request(`/api/tasks/${activeReview.taskId}/review?page=${page}&size=50`);
+            allItems.push(...(next.items || []));
+          }
+          const grouped = groupIssues(allItems);
+          const saved = restoreDecisions(grouped);
+          for (const [key, value] of reviewControls) saved.set(key, value);
+          const decisions = buildDecisionSnapshot(grouped, saved);
+          const result = await request(`/api/tasks/${activeReview.taskId}/review`, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ expectedVersion: first.version, decisions }) });
+          activeReview.reviewTotal = result.total;
+          activeReview.revisedFileId = result.revisedFileId;
+          activeReview.reviewVersion = result.version;
+          activeReview.resultSummary = { ...(activeReview.resultSummary || {}), review: { version: result.version, revisedFileId: result.revisedFileId } };
+          await loadRowReviewPage();
+          showMessage(taskMessage, '修订结果已生成。 / Revised result created.');
+        } catch (error) {
+          showMessage(taskMessage, error.message || '复核提交失败，请刷新后重试。 / Review submission failed; refresh and retry.', 'error');
+          if (error.status === 409) await loadRowReviewPage();
+        } finally { button.disabled = false; }
+      });
+      async function loadTaskHistory() {
+        if (!token) return;
+        const params = new URLSearchParams({ page: String(historyPage), size: '10' });
+        const filters = [
+          ['status', $('historyStatus').value],
+          ['workflowType', $('historyWorkflow').value],
+          ['fromDate', $('historyFromDate').value],
+          ['toDate', $('historyToDate').value],
+        ];
+        for (const [name, value] of filters) if (value) params.set(name, value);
+        const loading = document.createElement('p');
+        loading.className = 'workflow-help';
+        loading.textContent = '正在加载任务 / Loading tasks.';
+        $('taskHistoryList').replaceChildren(loading);
+        try {
+          const result = await request(`/api/tasks?${params}`);
+          historyTotal = result.total;
+          renderTaskHistory(result.items || []);
+          const pages = Math.max(1, Math.ceil(historyTotal / result.size));
+          $('historyPageLabel').textContent = `${historyTotal} 个任务 / tasks · ${historyPage + 1}/${pages}`;
+          $('historyPrevButton').disabled = historyPage === 0;
+          $('historyNextButton').disabled = historyPage + 1 >= pages;
+        } catch (error) {
+          const message = document.createElement('p');
+          message.className = 'workflow-help';
+          message.textContent = error.message || '任务历史加载失败。 / Could not load task history.';
+          $('taskHistoryList').replaceChildren(message);
+        }
+      }
+      function reuseTaskRules(task) {
+        pendingHistoryOptions = task.workflowOptions || {};
+        pendingHistorySnapshot = task.workflowOptions?.schemaSnapshot || null;
+        activeTemplateId = '';
+        templateSelect.value = '';
+        $('fileInput').value = '';
+        workflowSelect.value = task.workflowType || 'FREEFORM';
+        replayingHistory = true;
+        workflowSelect.dispatchEvent(new Event('change'));
+        replayingHistory = false;
+        activeTemplateId = task.workflowOptions?.workflowTemplateId || '';
+        templateSelect.value = activeTemplateId;
+        $('prompt').value = task.prompt || '';
+        $('fileName').textContent = '请选择新文件 / Choose new files';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        $('fileInput').click();
+        showMessage(taskMessage, '已复用工作流和规则，请选择新文件并重新预览。 / Rules are loaded; choose new files and build a fresh preview.');
+      }
       async function uploadSelectedWorkflowFiles() {
         const files = selectedFiles();
         validateFileCount(files);
@@ -631,8 +1131,9 @@
           const payload = { fileIds: workflowFileIds, workflowType: workflowSelect.value, options: buildWorkflowOptions(), prompt: $('prompt').value.trim() };
           const preview = await request('/api/tasks/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
           workflowFingerprint = preview.previewFingerprint;
-          reviewedWorkflowRequest = payload;
+          reviewedWorkflowRequest = { ...payload, options: preview.confirmedOptions || payload.options };
           $('workflowReviewContent').textContent = JSON.stringify({ workflowType: preview.workflowType, files: preview.inputFiles.map((file) => ({ name: file.name, sheets: file.sheets.map((sheet) => sheet.name) })), operationSummary: preview.operationSummary }, null, 2);
+          renderQualityReport(preview.dataQuality);
           $('workflowReview').hidden = false;
           $('confirmWorkflowButton').hidden = false;
           showMessage(taskMessage, '请核对文件、工作表和规则；确认后任务开始运行。 / Review files, sheets, and rules; confirm to start.');
@@ -646,8 +1147,8 @@
       $('workflowOptionsPanel').addEventListener('input', clearReview);
       $('workflowOptionsPanel').addEventListener('change', clearReview);
 
-      async function downloadResult() {
-        const response = await fetch(`/api/files/${resultFileId}/download`, { headers: { Authorization: `Bearer ${token}` } });
+      async function downloadFile(fileId, filename) {
+        const response = await fetch(`/api/files/${fileId}/download`, { headers: { Authorization: `Bearer ${token}` } });
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           throw new Error(body.message || `下载失败（HTTP ${response.status}）`);
@@ -655,12 +1156,13 @@
         const url = URL.createObjectURL(await response.blob());
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'excel-ai-result.xlsx';
+        link.download = filename;
         document.body.append(link);
         link.click();
         link.remove();
         URL.revokeObjectURL(url);
       }
+      async function downloadResult() { await downloadFile(resultFileId, `excel-ai-result.${resultFileExtension}`); }
       $('downloadButton').addEventListener('click', async () => {
         try { await downloadResult(); }
         catch (error) { showMessage(taskMessage, error.message || '下载失败。', 'error'); }
@@ -684,9 +1186,11 @@
           $('resultProgress').textContent = `${task.progress}%`;
           if (task.status === 'COMPLETED') {
             resultFileId = task.resultFileId;
+            resultFileExtension = String(task.resultSummary?.operationDefinition?.outputFormat || 'XLSX').toLowerCase() === 'csv' ? 'csv' : 'xlsx';
             $('downloadButton').hidden = !resultFileId;
             renderResultSummary(task);
-            showMessage(taskMessage, '处理完成，可以下载结果文件。 / Complete; download the result workbook.');
+            showMessage(taskMessage, '处理完成，可以下载结果文件。 / Complete; download the result file.');
+            loadTaskHistory();
             return;
           }
           if (task.status === 'FAILED') {
@@ -694,6 +1198,7 @@
             $('resultError').hidden = false;
             renderResultSummary(task);
             showMessage(taskMessage, '任务没有完成，请检查提示后重试。 / The task failed; review the error and try again.', 'error');
+            loadTaskHistory();
             return;
           }
         }
@@ -717,6 +1222,7 @@
           showMessage(taskMessage, '任务已提交，页面会自动更新状态。 / Submitted; progress will update automatically.');
           $('resultTitle').textContent = `任务 #${created.taskId} · ${created.status}`;
           $('resultProgress').textContent = '0%';
+          loadTaskHistory();
           await watchTask(created.taskId);
         } catch (error) {
           showMessage(taskMessage, error.message || '确认失败；请重新生成预览。', 'error');
@@ -750,6 +1256,7 @@
             body: JSON.stringify({ fileId: uploaded.fileId, prompt: $('prompt').value.trim() }) });
           $('resultTitle').textContent = `任务 #${created.taskId} · ${created.status}`;
           $('resultProgress').textContent = '0%';
+          loadTaskHistory();
           showMessage(taskMessage, '任务已提交，页面会自动更新状态。');
           await watchTask(created.taskId);
         } catch (error) {

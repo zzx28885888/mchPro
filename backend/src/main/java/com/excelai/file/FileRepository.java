@@ -43,4 +43,8 @@ public class FileRepository {
         return entity == null ? null : new FileRecord(entity.getId(), entity.getUserId(), entity.getOriginalName(),
                 entity.getStoredName(), entity.getStoragePath(), entity.getSizeBytes(), entity.getContentType(), entity.getFileRole());
     }
+
+    public void deleteOwned(Long id, Long uid) {
+        mapper.delete(new QueryWrapper<UserFileEntity>().eq("id", id).eq("user_id", uid));
+    }
 }

@@ -48,9 +48,9 @@ public class TaskWorker {
             for (Long fileId : fileIds) {
                 if (files.findOwned(fileId, uid) == null) throw new IllegalArgumentException("input file not found");
             }
-            agent.execute(uid, id, fileIds, task.workflowType(), options, task.prompt(), plan.maxToolCalls());
+            agent.execute(uid, id, fileIds, task.workflowType(), executionOptions(options), task.prompt(), plan.maxToolCalls());
             Long result = taskData.result(id);
-            if (result == null) throw new IllegalStateException("Agent completed without exporting a result workbook");
+            if (result == null) throw new IllegalStateException("Agent completed without exporting a result file");
             tasks.done(id, result);
         } catch (Exception e) {
             String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
@@ -58,5 +58,12 @@ public class TaskWorker {
         } finally {
             taskData.clear(id);
         }
+    }
+
+    static Map<String, Object> executionOptions(Map<String, Object> persistedOptions) {
+        Map<String, Object> options = new java.util.TreeMap<>(persistedOptions);
+        options.remove("workflowTemplateId");
+        options.remove("schemaSnapshot");
+        return options;
     }
 }

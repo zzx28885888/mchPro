@@ -20,21 +20,54 @@ import java.util.regex.Pattern;
 @Service
 public class ExcelWorkflowService {
     public WorkflowResult mergeAndClean(List<SheetInput> inputs, MergeOptions options) {
+        return mergeAndClean(inputs, options, Map.of());
+    }
+
+    public WorkflowResult mergeAndClean(List<SheetInput> inputs, MergeOptions options,
+                                        Map<MergeReviewDecision.SourceRowKey, MergeReviewDecision.Decision> decisions) {
+        Map<MergeReviewDecision.SourceRowKey, MergeReviewDecision.Decision> reviewDecisions = decisions == null ? Map.of() : Map.copyOf(decisions);
+        if (reviewDecisions.isEmpty()) return mergeAndCleanInternal(inputs, options, reviewDecisions);
+        WorkflowResult original = mergeAndCleanInternal(inputs, options, Map.of());
+        validateReviewDecisions(inputs, original, reviewDecisions);
+        WorkflowResult revised = mergeAndCleanInternal(inputs, options, reviewDecisions);
+        for (var entry : reviewDecisions.entrySet()) {
+            if (entry.getValue().action() == MergeReviewDecision.Action.CORRECT
+                    && revised.exceptions().stream().anyMatch(issue -> rowKey(issue).equals(entry.getKey())
+                    && Set.of("INVALID_DATE", "INVALID_AMOUNT").contains(issue.code()))) {
+                throw new IllegalArgumentException("Corrected values remain invalid for row " + entry.getKey().rowNumber());
+            }
+        }
+        return revised;
+    }
+
+    private WorkflowResult mergeAndCleanInternal(List<SheetInput> inputs, MergeOptions options,
+                                                  Map<MergeReviewDecision.SourceRowKey, MergeReviewDecision.Decision> decisions) {
         if (inputs == null || inputs.isEmpty()) throw new IllegalArgumentException("At least one source sheet is required");
         if (options == null || options.headerAliases().isEmpty()) throw new IllegalArgumentException("Explicit header mappings are required");
         List<String> outputHeaders = List.copyOf(options.headerAliases().keySet());
         List<List<String>> outputRows = new ArrayList<>();
         List<WorkflowResult.RowException> exceptions = new ArrayList<>();
         Set<List<String>> seenKeys = new HashSet<>();
-        long sourceRows = 0, blankRows = 0, duplicates = 0;
+        long sourceRows = 0, blankRows = 0, duplicates = 0, reviewedRowsSkipped = 0;
 
         for (SheetInput input : inputs) {
             sourceRows += input.rows().size();
             Map<String, List<Integer>> columns = resolveColumns(input, options, exceptions);
             for (int rowIndex = 0; rowIndex < input.rows().size(); rowIndex++) {
-                List<String> source = input.rows().get(rowIndex);
                 int rowNumber = rowIndex + 2;
-                if (source.stream().allMatch(value -> value == null || value.isBlank()) && options.skipBlankRows()) {
+                var sourceRowKey = new MergeReviewDecision.SourceRowKey(input.fileId(), input.sheetName(), rowNumber);
+                var decision = decisions.get(sourceRowKey);
+                if (decision != null && decision.action() == MergeReviewDecision.Action.SKIP) {
+                    reviewedRowsSkipped++;
+                    continue;
+                }
+                List<String> source = input.rows().get(rowIndex);
+                if (decision != null && decision.action() == MergeReviewDecision.Action.CORRECT) {
+                    source = correctedSource(source, columns, decision.corrections());
+                }
+                boolean blank = source.stream().allMatch(value -> value == null || value.isBlank());
+                boolean keep = decision != null && decision.action() != MergeReviewDecision.Action.SKIP;
+                if (blank && options.skipBlankRows() && !keep) {
                     blankRows++;
                     exceptions.add(new WorkflowResult.RowException("BLANK_ROW_SKIPPED", input.fileId(), input.sheetName(), rowNumber, "", "Blank row skipped / 已跳过空行", ""));
                     continue;
@@ -58,9 +91,11 @@ public class ExcelWorkflowService {
                     if (keyIndexes.stream().anyMatch(index -> index < 0)) throw new IllegalArgumentException("Duplicate keys must name mapped output columns");
                     List<String> key = keyIndexes.stream().map(output::get).toList();
                     if (key.stream().noneMatch(String::isBlank) && !seenKeys.add(key)) {
-                        duplicates++;
-                        exceptions.add(new WorkflowResult.RowException("DUPLICATE_ROW_SKIPPED", input.fileId(), input.sheetName(), rowNumber, String.join(",", options.duplicateKeyColumns()), "Duplicate row skipped / 已跳过重复行", String.join("|", key)));
-                        continue;
+                        if (!keep) {
+                            duplicates++;
+                            exceptions.add(new WorkflowResult.RowException("DUPLICATE_ROW_SKIPPED", input.fileId(), input.sheetName(), rowNumber, String.join(",", options.duplicateKeyColumns()), "Duplicate row skipped / 已跳过重复行", String.join("|", key)));
+                            continue;
+                        }
                     }
                 }
                 outputRows.add(List.copyOf(output));
@@ -72,7 +107,57 @@ public class ExcelWorkflowService {
         counts.put("blankRowsSkipped", blankRows);
         counts.put("duplicatesRemoved", duplicates);
         counts.put("exceptionRows", (long) exceptions.size());
+        if (!decisions.isEmpty()) counts.put("reviewedRowsSkipped", reviewedRowsSkipped);
         return new WorkflowResult(List.of(new OutputSheet("merged_data", outputHeaders, outputRows)), counts, List.of(), exceptions);
+    }
+
+    private void validateReviewDecisions(List<SheetInput> inputs, WorkflowResult original,
+                                         Map<MergeReviewDecision.SourceRowKey, MergeReviewDecision.Decision> decisions) {
+        Set<MergeReviewDecision.SourceRowKey> sourceRows = new HashSet<>();
+        for (SheetInput input : inputs) {
+            for (int row = 0; row < input.rows().size(); row++)
+                sourceRows.add(new MergeReviewDecision.SourceRowKey(input.fileId(), input.sheetName(), row + 2));
+        }
+        Map<MergeReviewDecision.SourceRowKey, Set<String>> supportedIssues = new LinkedHashMap<>();
+        original.exceptions().stream()
+                .filter(issue -> Set.of("INVALID_DATE", "INVALID_AMOUNT", "DUPLICATE_ROW_SKIPPED", "BLANK_ROW_SKIPPED").contains(issue.code()))
+                .forEach(issue -> supportedIssues.computeIfAbsent(rowKey(issue), ignored -> new LinkedHashSet<>()).add(issue.code() + "\u0000" + issue.column()));
+
+        for (var entry : decisions.entrySet()) {
+            var key = entry.getKey();
+            var decision = entry.getValue();
+            if (!sourceRows.contains(key) || !supportedIssues.containsKey(key))
+                throw new IllegalArgumentException("Review decision does not reference a supported issue row");
+            if (decision.action() != MergeReviewDecision.Action.CORRECT) {
+                if (!decision.corrections().isEmpty()) throw new IllegalArgumentException("Only corrected rows may include corrected values");
+                continue;
+            }
+            Set<String> expectedColumns = supportedIssues.get(key).stream()
+                    .filter(issue -> issue.startsWith("INVALID_DATE\u0000") || issue.startsWith("INVALID_AMOUNT\u0000"))
+                    .map(issue -> issue.substring(issue.indexOf('\u0000') + 1))
+                    .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+            if (expectedColumns.isEmpty() || !expectedColumns.equals(decision.corrections().keySet()))
+                throw new IllegalArgumentException("Corrections must cover exactly the reported date and amount columns");
+            if (decision.corrections().values().stream().anyMatch(value -> value == null || value.isBlank() || value.length() > 200))
+                throw new IllegalArgumentException("Corrected values must contain between 1 and 200 characters");
+        }
+    }
+
+    private List<String> correctedSource(List<String> source, Map<String, List<Integer>> columns,
+                                         Map<String, String> corrections) {
+        List<String> corrected = new ArrayList<>(source);
+        for (var correction : corrections.entrySet()) {
+            List<Integer> matches = columns.getOrDefault(correction.getKey(), List.of());
+            if (matches.size() != 1) throw new IllegalArgumentException("Correction column is missing or ambiguous: " + correction.getKey());
+            int sourceColumn = matches.get(0);
+            while (corrected.size() <= sourceColumn) corrected.add("");
+            corrected.set(sourceColumn, correction.getValue());
+        }
+        return corrected;
+    }
+
+    private MergeReviewDecision.SourceRowKey rowKey(WorkflowResult.RowException issue) {
+        return new MergeReviewDecision.SourceRowKey(issue.fileId(), issue.sheetName(), issue.rowNumber());
     }
 
     private Map<String, List<Integer>> resolveColumns(SheetInput input, MergeOptions options, List<WorkflowResult.RowException> exceptions) {

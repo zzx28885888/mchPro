@@ -15,6 +15,9 @@
 **Spec:** [`docs/superpowers/specs/2026-10-01-excel-business-workflows-design.md`](../specs/2026-10-01-excel-business-workflows-design.md)
 **规格：** [`docs/superpowers/specs/2026-10-01-excel-business-workflows-design.md`](../specs/2026-10-01-excel-business-workflows-design.md)
 
+> **Progress update (2026-10-19) / 进度更新（2026-10-19）：** Tasks 1–6 implementation, test additions, passing verification, and corresponding commits are present in the current source/history; the full backend suite (32 tests) and Agent schema suite (2 tests) pass. The six “confirm tests fail before implementation” checkboxes are historical TDD checkpoints that cannot be verified from current evidence, so they remain unchecked and are not outstanding product work. Task 7 implementation/documentation/commit are present; UI checks and migration/manual-flow verification remain open.
+> **进度更新（2026-10-19）：** 当前源码/历史中已包含任务 1–6 的实现、测试、通过验证及对应提交；后端完整测试（32 项）和 Agent Schema 测试（2 项）均通过。六个“确认测试在实现前失败”的复选框属于历史 TDD 检查点，现有证据无法回溯，因此保留未勾选，但不代表产品实现待办。任务 7 的实现/文档/提交已存在；界面检查与迁移/手动流程验证仍待完成。
+
 ## Global Constraints / 全局约束
 
 - “Do not overwrite or mutate source workbooks.” / “不覆盖或修改源工作簿。”
@@ -51,11 +54,11 @@
 
 **Files / 文件：** Modify `backend/src/main/java/com/excelai/excel/ExcelService.java`; create `ExcelWorkbook.java`; test `backend/src/test/java/com/excelai/excel/ExcelServiceTest.java`. / **文件：** 修改 `backend/src/main/java/com/excelai/excel/ExcelService.java`；创建 `ExcelWorkbook.java`；测试文件为 `backend/src/test/java/com/excelai/excel/ExcelServiceTest.java`。
 
-- [ ] Add `ExcelServiceTest.readWorkbookReturnsEverySheetInOrder` and `ExcelServiceTest.readsAllSheetsAndPreservesHeaderConflicts`; assert sheet names/order, row values, blank headers, and duplicate headers remain detectable. / 新增 `ExcelServiceTest.readWorkbookReturnsEverySheetInOrder` 和 `ExcelServiceTest.readsAllSheetsAndPreservesHeaderConflicts`；断言工作表名称/顺序、行值、空表头和重复表头均可被检测。
+- [x] Add `ExcelServiceTest.readWorkbookReturnsEverySheetInOrder` and `ExcelServiceTest.readsAllSheetsAndPreservesHeaderConflicts`; assert sheet names/order, row values, blank headers, and duplicate headers remain detectable. / 新增 `ExcelServiceTest.readWorkbookReturnsEverySheetInOrder` 和 `ExcelServiceTest.readsAllSheetsAndPreservesHeaderConflicts`；断言工作表名称/顺序、行值、空表头和重复表头均可被检测。
 - [ ] Run `mvn -q -f backend/pom.xml -Dtest=ExcelServiceTest test`; confirm the tests fail against the current first-sheet-only reader. / 运行 `mvn -q -f backend/pom.xml -Dtest=ExcelServiceTest test`；确认当前仅读首表的实现无法通过测试。
-- [ ] Implement `ExcelWorkbook` and `ExcelService.readWorkbook(Path)` using the existing EasyExcel dependency; do not collapse duplicate headers into one map key. / 使用现有 EasyExcel 依赖实现 `ExcelWorkbook` 和 `ExcelService.readWorkbook(Path)`；不得将重复表头折叠成同一个 Map 键。
-- [ ] Keep `ExcelService.read(Path)` returning the first sheet and run the focused test command; expect PASS. / 保持 `ExcelService.read(Path)` 返回首个工作表，并运行指定测试命令；预期通过。
-- [ ] Commit as `feat: read bounded multi-sheet workbooks`. / 提交为 `feat: read bounded multi-sheet workbooks`。
+- [x] Implement `ExcelWorkbook` and `ExcelService.readWorkbook(Path)` using the existing EasyExcel dependency; do not collapse duplicate headers into one map key. / 使用现有 EasyExcel 依赖实现 `ExcelWorkbook` 和 `ExcelService.readWorkbook(Path)`；不得将重复表头折叠成同一个 Map 键。
+- [x] Keep `ExcelService.read(Path)` returning the first sheet and run the focused test command; expect PASS. / 保持 `ExcelService.read(Path)` 返回首个工作表，并运行指定测试命令；预期通过。
+- [x] Commit as `feat: read bounded multi-sheet workbooks`. / 提交为 `feat: read bounded multi-sheet workbooks`。
 
 ## Task 2: Typed tasks, multi-file ownership, and pre-run review API / 任务 2：带类型任务、多文件归属校验与执行前预览 API
 
@@ -63,13 +66,13 @@
 
 **Files / 文件：** Modify `infra/init.sql`, `backend/src/main/java/com/excelai/task/{TaskController,TaskService,TaskRepository,TaskWorker,TaskRedisService}.java`, `backend/src/main/java/com/excelai/persistence/entity/AiTaskEntity.java`, `backend/src/main/java/com/excelai/agent/AgentService.java`, and `backend/src/main/java/com/example/agent/tool/controller/AgentToolController.java`; add an idempotent migration under `infra/migrations/`; test `backend/src/test/java/com/excelai/task/TaskServiceTest.java` and controller tests. / **文件：** 修改 `infra/init.sql`、`backend/src/main/java/com/excelai/task/{TaskController,TaskService,TaskRepository,TaskWorker,TaskRedisService}.java`、`backend/src/main/java/com/excelai/persistence/entity/AiTaskEntity.java`、`backend/src/main/java/com/excelai/agent/AgentService.java` 和 `backend/src/main/java/com/example/agent/tool/controller/AgentToolController.java`；在 `infra/migrations/` 下新增幂等迁移；测试 `backend/src/test/java/com/excelai/task/TaskServiceTest.java` 和 Controller 测试。
 
-- [ ] Add tests for mixed ownership, duplicate IDs, empty lists, invalid workflow cardinality (merge >= 2, reconcile = 2, summary = 1), per-file/aggregate size limits, legacy one-file requests, and preview fingerprint mismatch. / 新增测试覆盖混合文件归属、重复 ID、空列表、工作流文件数量不符（合并 >= 2、对账 = 2、汇总 = 1）、单文件/总大小限制、旧版单文件请求和预览指纹不匹配。
+- [x] Add tests for mixed ownership, duplicate IDs, empty lists, invalid workflow cardinality (merge >= 2, reconcile = 2, summary = 1), per-file/aggregate size limits, legacy one-file requests, and preview fingerprint mismatch. / 新增测试覆盖混合文件归属、重复 ID、空列表、工作流文件数量不符（合并 >= 2、对账 = 2、汇总 = 1）、单文件/总大小限制、旧版单文件请求和预览指纹不匹配。
 - [ ] Run focused TaskService/controller tests and confirm they fail before implementation. / 运行指定 TaskService/Controller 测试，确认实现前测试失败。
-- [ ] Add the join table and workflow metadata/summary persistence; make task input ordering deterministic. / 新增任务输入关联表及工作流元数据/摘要持久化；确保输入文件顺序稳定。
-- [ ] Implement preview by checking every file with `FileRepository.findOwned`, reading workbook schemas, validating cardinality/options, and returning a short-lived fingerprint bound to user, ordered file IDs, workflow, and normalized options. Reject preview/task mismatch. / 通过 `FileRepository.findOwned` 校验每个文件，读取工作簿结构，验证文件数量/选项，并生成与用户、排序后的文件 ID、工作流及规范化选项绑定的短期指纹。拒绝预览与建任务参数不一致的请求。
-- [ ] Make `TaskService.create` revalidate ownership, plan size/quota and fingerprint, persist all inputs, and pass trusted context `inputFileIds`, `workflowType`, `options`, and `maxToolCalls`; model tool arguments cannot override context. / 使 `TaskService.create` 重新校验文件归属、套餐大小/额度和指纹，持久化全部输入，并传递可信上下文 `inputFileIds`、`workflowType`、`options` 和 `maxToolCalls`；模型工具参数不得覆盖上下文。
-- [ ] Keep the existing `{fileId,prompt}` request working by normalizing it to one-file `FREEFORM`; run focused tests and expect PASS. / 将现有 `{fileId,prompt}` 请求规范化为单文件 `FREEFORM` 并保持兼容；运行指定测试并确认通过。
-- [ ] Commit as `feat: support validated multi-file workflow tasks`. / 提交为 `feat: support validated multi-file workflow tasks`。
+- [x] Add the join table and workflow metadata/summary persistence; make task input ordering deterministic. / 新增任务输入关联表及工作流元数据/摘要持久化；确保输入文件顺序稳定。
+- [x] Implement preview by checking every file with `FileRepository.findOwned`, reading workbook schemas, validating cardinality/options, and returning a short-lived fingerprint bound to user, ordered file IDs, workflow, and normalized options. Reject preview/task mismatch. / 通过 `FileRepository.findOwned` 校验每个文件，读取工作簿结构，验证文件数量/选项，并生成与用户、排序后的文件 ID、工作流及规范化选项绑定的短期指纹。拒绝预览与建任务参数不一致的请求。
+- [x] Make `TaskService.create` revalidate ownership, plan size/quota and fingerprint, persist all inputs, and pass trusted context `inputFileIds`, `workflowType`, `options`, and `maxToolCalls`; model tool arguments cannot override context. / 使 `TaskService.create` 重新校验文件归属、套餐大小/额度和指纹，持久化全部输入，并传递可信上下文 `inputFileIds`、`workflowType`、`options` 和 `maxToolCalls`；模型工具参数不得覆盖上下文。
+- [x] Keep the existing `{fileId,prompt}` request working by normalizing it to one-file `FREEFORM`; run focused tests and expect PASS. / 将现有 `{fileId,prompt}` 请求规范化为单文件 `FREEFORM` 并保持兼容；运行指定测试并确认通过。
+- [x] Commit as `feat: support validated multi-file workflow tasks`. / 提交为 `feat: support validated multi-file workflow tasks`。
 
 ## Task 3: Shared deterministic merge and cleanup / 任务 3：共享的确定性合并与清洗
 
@@ -77,11 +80,11 @@
 
 **Files / 文件：** Create/modify `backend/src/main/java/com/excelai/excel/{ExcelWorkflowService,WorkflowResult,SheetInput}.java`; test `backend/src/test/java/com/excelai/excel/ExcelWorkflowServiceTest.java`. / **文件：** 创建/修改 `backend/src/main/java/com/excelai/excel/{ExcelWorkflowService,WorkflowResult,SheetInput}.java`；测试文件为 `backend/src/test/java/com/excelai/excel/ExcelWorkflowServiceTest.java`。
 
-- [ ] Add tests `mergeMapsExplicitHeaderAliases`, `mergeReportsConflictingAndUnmappedHeaders`, `cleanupRemovesConfiguredDuplicatesAndBlankRows`, and `cleanupReportsInvalidDateOrAmount`; assert source rows are unchanged. / 新增测试 `mergeMapsExplicitHeaderAliases`、`mergeReportsConflictingAndUnmappedHeaders`、`cleanupRemovesConfiguredDuplicatesAndBlankRows` 和 `cleanupReportsInvalidDateOrAmount`；断言源行不被修改。
+- [x] Add tests `mergeMapsExplicitHeaderAliases`, `mergeReportsConflictingAndUnmappedHeaders`, `cleanupRemovesConfiguredDuplicatesAndBlankRows`, and `cleanupReportsInvalidDateOrAmount`; assert source rows are unchanged. / 新增测试 `mergeMapsExplicitHeaderAliases`、`mergeReportsConflictingAndUnmappedHeaders`、`cleanupRemovesConfiguredDuplicatesAndBlankRows` 和 `cleanupReportsInvalidDateOrAmount`；断言源行不被修改。
 - [ ] Run the focused workflow tests and confirm failure. / 运行指定工作流测试并确认失败。
-- [ ] Implement deterministic header mapping, duplicate policy, blank-row handling, and explicitly configured date/amount normalization; ambiguous mappings become exceptions, never inferred merges. / 实现确定性的表头映射、去重策略、空行处理及显式配置的日期/金额标准化；映射歧义应作为异常返回，禁止推断式合并。
-- [ ] Run focused tests and confirm PASS, including row-level source provenance in exceptions. / 运行指定测试并确认通过，异常结果中须包含逐行来源信息。
-- [ ] Commit as `feat: merge and clean Excel workbooks`. / 提交为 `feat: merge and clean Excel workbooks`。
+- [x] Implement deterministic header mapping, duplicate policy, blank-row handling, and explicitly configured date/amount normalization; ambiguous mappings become exceptions, never inferred merges. / 实现确定性的表头映射、去重策略、空行处理及显式配置的日期/金额标准化；映射歧义应作为异常返回，禁止推断式合并。
+- [x] Run focused tests and confirm PASS, including row-level source provenance in exceptions. / 运行指定测试并确认通过，异常结果中须包含逐行来源信息。
+- [x] Commit as `feat: merge and clean Excel workbooks`. / 提交为 `feat: merge and clean Excel workbooks`。
 
 ## Task 4: Reconcile two workbooks / 任务 4：两份工作簿对账
 
@@ -89,11 +92,11 @@
 
 **Files / 文件：** Modify `ExcelWorkflowService.java`, add `ReconcileOptions.java`; test `backend/src/test/java/com/excelai/excel/ExcelWorkflowServiceTest.java`. / **文件：** 修改 `ExcelWorkflowService.java`，新增 `ReconcileOptions.java`；测试 `backend/src/test/java/com/excelai/excel/ExcelWorkflowServiceTest.java`。
 
-- [ ] Add tests `reconciliationReportsBlankAndDuplicateKeys`, `reconciliationAppliesInclusiveToleranceAndReportsInvalidNumbers`, and `reconciliationPreservesUnmatchedRows`; assert no arbitrary pairing occurs for ambiguous keys. / 新增测试 `reconciliationReportsBlankAndDuplicateKeys`、`reconciliationAppliesInclusiveToleranceAndReportsInvalidNumbers` 和 `reconciliationPreservesUnmatchedRows`；断言歧义键不会被任意配对。
+- [x] Add tests `reconciliationReportsBlankAndDuplicateKeys`, `reconciliationAppliesInclusiveToleranceAndReportsInvalidNumbers`, and `reconciliationPreservesUnmatchedRows`; assert no arbitrary pairing occurs for ambiguous keys. / 新增测试 `reconciliationReportsBlankAndDuplicateKeys`、`reconciliationAppliesInclusiveToleranceAndReportsInvalidNumbers` 和 `reconciliationPreservesUnmatchedRows`；断言歧义键不会被任意配对。
 - [ ] Run focused tests and confirm failure. / 运行指定测试并确认失败。
-- [ ] Implement deterministic key normalization, one-to-one matches only for unique nonblank keys, categorized outputs, and explicit tolerance comparisons. / 实现确定性键标准化；仅对唯一且非空的键执行一对一匹配；生成分类结果并按明确容差比较。
-- [ ] Run focused tests and confirm PASS; ensure numeric parse failures are included as row exceptions. / 运行指定测试并确认通过；数值解析失败须纳入逐行异常。
-- [ ] Commit as `feat: reconcile Excel workbooks`. / 提交为 `feat: reconcile Excel workbooks`。
+- [x] Implement deterministic key normalization, one-to-one matches only for unique nonblank keys, categorized outputs, and explicit tolerance comparisons. / 实现确定性键标准化；仅对唯一且非空的键执行一对一匹配；生成分类结果并按明确容差比较。
+- [x] Run focused tests and confirm PASS; ensure numeric parse failures are included as row exceptions. / 运行指定测试并确认通过；数值解析失败须纳入逐行异常。
+- [x] Commit as `feat: reconcile Excel workbooks`. / 提交为 `feat: reconcile Excel workbooks`。
 
 ## Task 5: Grouped reporting and chart workbook output / 任务 5：分组报表与图表工作簿输出
 
@@ -101,11 +104,11 @@
 
 **Files / 文件：** Modify `ExcelService.java`, `ExcelWorkflowService.java`; create `SummaryOptions.java`, `OutputSheet.java`; add direct Apache POI OOXML dependency only if chart generation cannot be implemented through the currently resolved dependencies; test `ExcelWorkflowServiceTest.java` and `ExcelServiceTest.java`. / **文件：** 修改 `ExcelService.java`、`ExcelWorkflowService.java`；新增 `SummaryOptions.java`、`OutputSheet.java`；仅当当前解析到的依赖无法实现图表时，才添加 Apache POI OOXML 直接依赖；测试 `ExcelWorkflowServiceTest.java` 和 `ExcelServiceTest.java`。
 
-- [ ] Add tests `summaryGroupsAndRanksByConfiguredDimensions`, `summaryReportsInvalidDatesAndPeriodDefinition`, `summaryRejectsUnknownMeasureOrDimension`, and `writeWorkbookCreatesNamedSheetsAndChartsWhenSupported`. / 新增测试 `summaryGroupsAndRanksByConfiguredDimensions`、`summaryReportsInvalidDatesAndPeriodDefinition`、`summaryRejectsUnknownMeasureOrDimension` 和 `writeWorkbookCreatesNamedSheetsAndChartsWhenSupported`。
+- [x] Add tests `summaryGroupsAndRanksByConfiguredDimensions`, `summaryReportsInvalidDatesAndPeriodDefinition`, `summaryRejectsUnknownMeasureOrDimension`, and `writeWorkbookCreatesNamedSheetsAndChartsWhenSupported`. / 新增测试 `summaryGroupsAndRanksByConfiguredDimensions`、`summaryReportsInvalidDatesAndPeriodDefinition`、`summaryRejectsUnknownMeasureOrDimension` 和 `writeWorkbookCreatesNamedSheetsAndChartsWhenSupported`。
 - [ ] Run focused tests and confirm failure. / 运行指定测试并确认失败。
-- [ ] Implement stable grouped aggregation/ranking, period labels, invalid-date exceptions, and summary sheets. Add a basic chart only for chartable grouped/time-series output; keep workbook usable if chart creation is unsupported. / 实现稳定的分组聚合/排名、周期标签、无效日期异常和摘要工作表。仅对适合绘图的分组/时间序列结果添加基础图表；若无法生成图表，工作簿数据仍须可用。
-- [ ] Run focused tests and confirm PASS; verify output sheet names and chart series reference the computed table. / 运行指定测试并确认通过；校验输出工作表名称以及图表数据系列引用已计算的数据表。
-- [ ] Commit as `feat: create grouped Excel summary reports`. / 提交为 `feat: create grouped Excel summary reports`。
+- [x] Implement stable grouped aggregation/ranking, period labels, invalid-date exceptions, and summary sheets. Add a basic chart only for chartable grouped/time-series output; keep workbook usable if chart creation is unsupported. / 实现稳定的分组聚合/排名、周期标签、无效日期异常和摘要工作表。仅对适合绘图的分组/时间序列结果添加基础图表；若无法生成图表，工作簿数据仍须可用。
+- [x] Run focused tests and confirm PASS; verify output sheet names and chart series reference the computed table. / 运行指定测试并确认通过；校验输出工作表名称以及图表数据系列引用已计算的数据表。
+- [x] Commit as `feat: create grouped Excel summary reports`. / 提交为 `feat: create grouped Excel summary reports`。
 
 ## Task 6: Workflow tools, permissions, and result summary / 任务 6：工作流工具、权限和结果摘要
 
@@ -113,12 +116,12 @@
 
 **Files / 文件：** Modify `ExcelAgentTools.java`, `TaskDataService.java`, `TaskRepository.java`, `TaskController.java`, `AgentService.java`, `infra/init.sql`, and plan permission seeds; add `ExcelWorkflowTools.java`; modify `agent-service/java_langgraph_tools.py` and `agent-service/agent_graph.py`; test Java registry/context/controller and Python schemas. / **文件：** 修改 `ExcelAgentTools.java`、`TaskDataService.java`、`TaskRepository.java`、`TaskController.java`、`AgentService.java`、`infra/init.sql` 和套餐工具权限初始化数据；新增 `ExcelWorkflowTools.java`；修改 `agent-service/java_langgraph_tools.py` 与 `agent-service/agent_graph.py`；测试 Java 注册表/上下文/Controller 及 Python Schema。
 
-- [ ] Add tests asserting model-supplied file/user IDs are rejected, ungranted workflow tools are denied, task context input IDs are ownership-checked, summaries persist/return, and all Python schemas match Java tool names/arguments. / 新增测试断言：拒绝模型提供的文件/用户 ID、拒绝未授权工作流工具、任务上下文输入 ID 经归属校验、摘要可持久化/返回、Python Schema 与 Java 工具名称/参数一致。
+- [x] Add tests asserting model-supplied file/user IDs are rejected, ungranted workflow tools are denied, task context input IDs are ownership-checked, summaries persist/return, and all Python schemas match Java tool names/arguments. / 新增测试断言：拒绝模型提供的文件/用户 ID、拒绝未授权工作流工具、任务上下文输入 ID 经归属校验、摘要可持久化/返回、Python Schema 与 Java 工具名称/参数一致。
 - [ ] Run focused Java and Python tests and confirm failure. / 运行指定 Java 和 Python 测试并确认失败。
-- [ ] Implement the tool boundary and task summary persistence; retain existing plan and audit enforcement for every tool call. / 实现工具边界与任务摘要持久化；每次工具调用均保留现有套餐授权和审计校验。
-- [ ] Update the English system prompt and bilingual comments/docstrings so the Agent follows the selected workflow, inspects inputs first, asks rather than guesses, and exports only after deterministic tools succeed. / 更新英文系统提示及中英双语注释/文档字符串，使 Agent 遵循已选工作流、先检查输入、遇到不确定时先询问，并仅在确定性工具成功后导出。
-- [ ] Run focused Java and Python tests and confirm PASS. / 运行指定 Java 和 Python 测试并确认通过。
-- [ ] Commit as `feat: orchestrate controlled Excel workflows`. / 提交为 `feat: orchestrate controlled Excel workflows`。
+- [x] Implement the tool boundary and task summary persistence; retain existing plan and audit enforcement for every tool call. / 实现工具边界与任务摘要持久化；每次工具调用均保留现有套餐授权和审计校验。
+- [x] Update the English system prompt and bilingual comments/docstrings so the Agent follows the selected workflow, inspects inputs first, asks rather than guesses, and exports only after deterministic tools succeed. / 更新英文系统提示及中英双语注释/文档字符串，使 Agent 遵循已选工作流、先检查输入、遇到不确定时先询问，并仅在确定性工具成功后导出。
+- [x] Run focused Java and Python tests and confirm PASS. / 运行指定 Java 和 Python 测试并确认通过。
+- [x] Commit as `feat: orchestrate controlled Excel workflows`. / 提交为 `feat: orchestrate controlled Excel workflows`。
 
 ## Task 7: Workflow UI and end-to-end integration / 任务 7：工作流界面与端到端集成
 
@@ -127,10 +130,10 @@
 **Files / 文件：** Modify `backend/src/main/resources/static/index.html`, `docs/learning-guide.md`, and `docs/excel-saas-integration.md`; add/extend API documentation in `docs/`. / **文件：** 修改 `backend/src/main/resources/static/index.html`、`docs/learning-guide.md` 和 `docs/excel-saas-integration.md`；在 `docs/` 下新增或扩展 API 文档。
 
 - [ ] Add UI checks for each workflow's file cardinality, preview-before-run, required column mappings, preview mismatch errors, and summary/exception rendering; retain the legacy free-form upload flow. / 增加界面检查，覆盖各工作流文件数量、先预览再执行、必填字段映射、预览参数不一致错误、摘要/异常展示；保留旧版自由输入上传流程。
-- [ ] Implement three workflow starters and dynamic forms; upload inputs, call preview, show file/sheet/field/rule summary, require explicit confirmation, submit the preview fingerprint, and render returned summary/exceptions. / 实现三个工作流入口和动态表单；上传输入文件、调用预览、展示文件/工作表/字段/规则摘要、要求用户明确确认、提交预览指纹，并展示返回摘要/异常。
-- [ ] Document request/response examples, migration application, tool permissions, and bilingual comment policy. / 以中英双语记录请求/响应示例、迁移应用方式、工具权限和双语注释要求。
+- [x] Implement three workflow starters and dynamic forms; upload inputs, call preview, show file/sheet/field/rule summary, require explicit confirmation, submit the preview fingerprint, and render returned summary/exceptions. / 实现三个工作流入口和动态表单；上传输入文件、调用预览、展示文件/工作表/字段/规则摘要、要求用户明确确认、提交预览指纹，并展示返回摘要/异常。
+- [x] Document request/response examples, migration application, tool permissions, and bilingual comment policy. / 以中英双语记录请求/响应示例、迁移应用方式、工具权限和双语注释要求。
 - [ ] Run the full verification set required by the implementation workflow; expected outcomes are backend tests/build, agent-service schema tests, migration initialization, and manual UI flows for all three workflows plus the legacy flow. / 按实施流程运行完整验证；预期结果包括后端测试/构建通过、Agent 服务 Schema 测试通过、迁移初始化成功，以及三个新工作流和旧版流程的手动界面检查通过。
-- [ ] Commit as `feat: expose Excel business workflows in UI`. / 提交为 `feat: expose Excel business workflows in UI`。
+- [x] Commit as `feat: expose Excel business workflows in UI`. / 提交为 `feat: expose Excel business workflows in UI`。
 
 ## Self-Review / 自审
 

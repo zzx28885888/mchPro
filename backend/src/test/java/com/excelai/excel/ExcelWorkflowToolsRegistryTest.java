@@ -14,7 +14,7 @@ class ExcelWorkflowToolsRegistryTest {
     @Test
     void workflowToolsRegisterWithEmptyModelControlledArgumentSchemas() {
         ApplicationContext context = mock(ApplicationContext.class);
-        ExcelWorkflowTools tools = new ExcelWorkflowTools(null, null, null, null, null, null, null);
+        ExcelWorkflowTools tools = new ExcelWorkflowTools(null, null, null, null, null, null, null, null);
         when(context.getBeansOfType(Object.class)).thenReturn(Map.of("excelWorkflowTools", tools));
         ToolRegistry registry = new ToolRegistry(context);
         Set<String> names = Set.of("inspect_workflow_inputs", "merge_clean_workbooks", "reconcile_workbooks", "summarize_workbook", "export_workbook_result");
