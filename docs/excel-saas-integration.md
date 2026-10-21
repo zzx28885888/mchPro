@@ -50,7 +50,8 @@ Task context (user ID, task ID, input file ID) must be supplied by the trusted S
 4. Add asynchronous task lifecycle and plan/usage enforcement; dispatch orchestration to LangGraph with signed or otherwise service-authenticated task context.
 5. Register legacy Excel capabilities and typed merge/clean, reconciliation, summary, and export tools in Java `@AgentTool`; keep IDs and options out of model-controlled arguments.
 6. Add multi-file typed task preview and confirmation, dynamic worksheet/field configuration, and result-summary display to the SaaS UI.
-7. Apply the idempotent `infra/migrations/001_excel_workflows.sql` migration to existing databases.
+7. Manage PostgreSQL schema changes with Flyway migrations `V1__initial_schema.sql` and `V2__excel_workflows.sql`; existing databases created by the old bootstrap SQL are baselined at version 1 before V2 runs.
+   使用 Flyway 迁移 `V1__initial_schema.sql` 和 `V2__excel_workflows.sql` 管理 PostgreSQL schema；由旧初始化 SQL 创建的数据库会先基线到版本 1，再执行 V2。
 8. Verify auth, upload, typed preview/create, tool execution, result download, cross-user denial, quota/file-size enforcement, and audit records.
 
 ## Compatibility decisions
@@ -62,7 +63,8 @@ Task context (user ID, task ID, input file ID) must be supplied by the trusted S
 
 ## Current state
 
-- PostgreSQL bootstrap has SaaS account, plan, file, task, usage, and plan-tool-permission tables; inserts use PostgreSQL `RETURNING id`.
+- Flyway V1 creates SaaS account, plan, file, task, usage, and plan-tool-permission tables and seeds the initial plans; inserts use PostgreSQL `RETURNING id`.
+  Flyway V1 会创建 SaaS 账号、套餐、文件、任务、用量和套餐工具权限表，并初始化套餐；插入操作使用 PostgreSQL `RETURNING id`。
 - The static SaaS page is served at `http://localhost:8080/`; auth, upload/download, async task create/status, and `/api/me` APIs are wired to Spring Boot.
 - Spring Boot authenticates users with JWT, stores uploaded and exported workbooks in the `excel_files` Docker volume, and tracks task progress in Redis.
 - Task context is supplied by the backend to LangGraph and forwarded to Java with a shared internal token. Java verifies file ownership and plan tool grants before execution.
@@ -70,3 +72,5 @@ Task context (user ID, task ID, input file ID) must be supplied by the trusted S
 - Merge/clean, reconcile, and summary are available as bounded typed workflows. The user reviews a deterministic preview before task creation; each task persists the input IDs, workflow options, operation summary, and row-level exceptions.
 - The Excel rowset is held in Redis for the lifetime of task processing; output metadata and completed task state are stored in PostgreSQL.
 - Runtime check confirmed homepage HTTP 200, PostgreSQL/Redis health, auth route response, five registered Excel tools, and Agent health. A paid/remote LLM task was not triggered during verification.
+- Flyway applies versioned schema migrations at Backend startup; existing databases from the former bootstrap path are baselined at version 1.
+  Flyway 会在 Backend 启动时应用版本化 schema 迁移；旧初始化流程创建的现有数据库会基线到版本 1。

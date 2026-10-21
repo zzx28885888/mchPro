@@ -3,9 +3,11 @@ package com.excelai.config;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.*;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration
-@EnableConfigurationProperties(AppProperties.class)
+@EnableScheduling
+@EnableConfigurationProperties({AppProperties.class, RateLimitProperties.class})
 /** 中文：声明应用级 Spring Bean 配置，例如异步任务线程池。English: Declares application-level Spring beans such as the asynchronous task pool. */
 public class AppConfig {
     @Bean("taskExecutor")

@@ -31,9 +31,13 @@ DeepSeek Harness 当前为 Developer Preview，因此本项目只做可选集成
 
 ## Excel SaaS 合并目标
 
-此仓库作为唯一技术底座，承接 `excel-ai-saas-v2` 的前端、注册登录、用户文件、异步任务、套餐/额度和 Excel 操作业务。业务由 Spring Boot 提供 API 和 Java Tool Registry；LangGraph 负责 Agent 编排；PostgreSQL 保存业务数据，Redis 保存任务进度和会话状态。Excel 文件通过 V1.6 LangGraph → Java Tool Registry 流程处理；不引入 V2 的 MySQL 或独立 Java AgentExecutor。
+此仓库作为唯一技术底座，承接 `excel-ai-saas-v2` 的前端、注册登录、用户文件、异步任务、套餐/额度和 Excel 操作业务。业务由 Spring Boot 提供 API 和 Java Tool Registry；LangGraph 负责 Agent 编排；PostgreSQL 保存业务数据、额度记录和可恢复任务状态，Redis 保存短期预览及任务处理期间的 Excel 行集。Excel 文件通过 V1.6 LangGraph → Java Tool Registry 流程处理；不引入 V2 的 MySQL 或独立 Java AgentExecutor。
 
-迁移说明见 `docs/excel-saas-integration.md`。PostgreSQL 初始化脚本包含 SaaS 业务表及 FREE/BASIC/PRO 初始套餐。
+This repository is the single technical foundation for the frontend, authentication, user files, asynchronous jobs, plans/quotas, and Excel operations from `excel-ai-saas-v2`. Spring Boot provides the API and Java Tool Registry; LangGraph orchestrates the Agent; PostgreSQL stores business data, quota records, and recoverable task state, while Redis stores short-lived previews and Excel rows during task processing. Excel workbooks follow the V1.6 LangGraph → Java Tool Registry flow; V2's MySQL and standalone Java AgentExecutor are not introduced.
+
+迁移说明见 `docs/excel-saas-integration.md`。Flyway V1 迁移包含 SaaS 业务表及 FREE/BASIC/PRO 初始套餐。
+
+See `docs/excel-saas-integration.md` for the migration guide. The Flyway V1 migration creates the SaaS tables and seeds the initial FREE/BASIC/PRO plans.
 
 学习代码的推荐阅读顺序、各模块职责、配置变量和数据边界见 [docs/learning-guide.md](docs/learning-guide.md)。源码和可注释配置文件内也补充了中英双语说明。
 
@@ -41,7 +45,35 @@ DeepSeek Harness 当前为 Developer Preview，因此本项目只做可选集成
 
 ### Docker 一键启动（推荐）
 
+#### 配置必需密钥 / Configure required secrets
+
+将 `.env.example` 复制为 `.env`，并为 `POSTGRES_PASSWORD`、`AGENT_INTERNAL_TOKEN` 和 `JWT_SECRET` 分别生成独立随机值。示例文件中的密钥留空；未填写时 Compose 会拒绝启动。
+
+Copy `.env.example` to `.env`, then generate independent random values for `POSTGRES_PASSWORD`, `AGENT_INTERNAL_TOKEN`, and `JWT_SECRET`. The example secrets are blank, and Compose refuses to start until they are set.
+
+在 PowerShell 中运行以下命令可生成三组随机值，然后将输出填入私有 `.env` 文件。不要提交 `.env` 或把同一个值用于多个密钥。
+
+Run the following PowerShell commands to generate three random values, then put the output in your private `.env` file. Do not commit `.env` or reuse one value for multiple secrets.
+
+```powershell
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+@('POSTGRES_PASSWORD', 'AGENT_INTERNAL_TOKEN', 'JWT_SECRET') | ForEach-Object {
+    $bytes = New-Object byte[] 32
+    $rng.GetBytes($bytes)
+    "$_=$([Convert]::ToBase64String($bytes))"
+}
+$rng.Dispose()
+```
+
+#### API 速率限制 / API rate limits
+
+认证与任务接口使用 Redis 固定窗口限流：注册默认每个客户端 IP 每小时 5 次，登录每 15 分钟 10 次，任务预览和创建合计每用户每分钟 10 次。超限返回 HTTP 429 和 `Retry-After`；Redis 不可用时这些写入接口返回 503。可通过 `.env` 中的 `RATE_LIMIT_*` 变量调整次数和窗口。限流使用 socket 对端 IP，忽略未验证的 `X-Forwarded-For`；部署在同一反向代理后的客户端会共享认证限流桶。
+
+Authentication and task endpoints use Redis fixed-window limits: registration defaults to 5 requests per client IP per hour, login to 10 per 15 minutes, and task preview plus creation to 10 per user per minute. Exceeded limits return HTTP 429 with `Retry-After`; these write endpoints return 503 when Redis is unavailable. Adjust limits and windows with the `RATE_LIMIT_*` variables in `.env`. The limiter uses the socket peer IP and ignores unverified `X-Forwarded-For`; clients behind the same reverse proxy share an authentication limit bucket.
+
 在项目根目录运行：
+
+From the repository root, run:
 
 ```powershell
 docker compose up --build -d
@@ -54,7 +86,21 @@ docker compose ps
 - Agent 健康检查：<http://localhost:8000/health>
 - Java Tool Registry：由 Agent 服务使用内部共享令牌访问，不作为公开 API 使用
 
-首次启动前将 `.env.example` 复制为根目录 `.env`，按需填写 LLM 设置与密钥。使用 `LLM_PROVIDER=ollama` 时，需要宿主机 Ollama 正在运行并准备好模型；使用 `LLM_PROVIDER=remote` 时，配置远程 OpenAI 兼容服务。停止服务：`docker compose down`（保留数据库卷）。
+任务由 PostgreSQL 持久化并由后端定时派发；后端重启后会重新排队未完成任务。月度额度检查与任务创建共用数据库事务。Java 工具最长执行时间为 60 秒，Agent→Java HTTP 读取超时默认 75 秒；可通过 `JAVA_TOOL_HTTP_TIMEOUT` 调整。
+
+Tasks are persisted in PostgreSQL and dispatched by a backend scheduler; unfinished tasks are requeued after a backend restart. Monthly quota checks and task creation share a database transaction. Java tools run for up to 60 seconds, and the Agent-to-Java HTTP read timeout defaults to 75 seconds; adjust it with `JAVA_TOOL_HTTP_TIMEOUT`.
+
+数据库 schema 由 Flyway 在 Backend 启动时管理：新数据库依次执行 V1 和 V2；由旧初始化脚本创建的数据库会基线到 V1，再执行幂等的 V2。不要再手动挂载或执行旧的初始化 SQL。
+
+Flyway manages the database schema when the Backend starts: a new database applies V1 and V2 in order; a database created by the previous bootstrap script is baselined at V1 and then receives the idempotent V2 migration. Do not manually mount or run the old initialization SQL.
+
+上传接口仅接受当前用户套餐大小限制内的有效 `.xlsx` 工作簿；ZIP 最多 10,000 个条目、实际累计解压不超过 256 MiB、单条目不超过 64 MiB，POI 最小解压比例为 1%。`.xls`、空文件、伪装文件及超过套餐限制的文件会在写入永久存储前被拒绝。
+
+Uploads accept only valid `.xlsx` workbooks within the authenticated user's plan size limit. ZIP archives are limited to 10,000 entries and 256 MiB of actual aggregate expansion, each entry is limited to 64 MiB, and POI enforces a 1% minimum inflate ratio. `.xls`, empty files, disguised content, and files over the plan limit are rejected before permanent storage.
+
+首次启动前将 `.env.example` 复制为根目录 `.env`，填写上文生成的密钥并按需填写 LLM 设置。使用 `LLM_PROVIDER=ollama` 时，需要宿主机 Ollama 正在运行并准备好模型；使用 `LLM_PROVIDER=remote` 时，配置远程 OpenAI 兼容服务。停止服务：`docker compose down`（保留数据库卷）。
+
+Before the first launch, copy `.env.example` to the repository root as `.env`, enter the generated secrets above, and configure LLM settings as needed. With `LLM_PROVIDER=ollama`, run Ollama on the host and prepare a model; with `LLM_PROVIDER=remote`, configure an OpenAI-compatible service. Stop the services with `docker compose down` (the database volume is preserved).
 
 如需远程 OpenAI 兼容模型，在根目录 `.env` 设置 `LLM_PROVIDER=remote`、`REMOTE_LLM_BASE_URL`、`REMOTE_LLM_API_KEY` 和 `REMOTE_LLM_MODEL`，然后运行 `docker compose up --build -d` 使配置生效。API Key 不要填入 `.env.example` 或提交到版本库。
 
@@ -74,15 +120,21 @@ ollama list
 
 ### 3. Python Agent
 
+本地单独运行 Agent 时，在 `agent-service/.env` 中设置与根目录 `.env` 完全相同的 `AGENT_INTERNAL_TOKEN`。
+
+When running the Agent locally by itself, set `AGENT_INTERNAL_TOKEN` in `agent-service/.env` to exactly the same value as in the repository-root `.env`.
+
 ```powershell
 cd agent-service
 uv python install 3.13
-uv venv --python 3.13
-.venv\Scripts\activate
-uv pip install -r requirements.txt
+uv sync
 copy .env.example .env
-python app.py
+uv run uvicorn app:app --host 0.0.0.0 --port 8000
 ```
+
+`uv sync` installs the exact versions recorded in `uv.lock`, including the development-only `pytest` group. The production container uses the same lockfile without development dependencies.
+
+`uv sync` 会根据 `uv.lock` 安装锁定版本，并包含仅用于开发的 `pytest` 依赖组。生产容器使用同一锁文件，但不安装开发依赖。
 
 ### 4. Spring Boot
 

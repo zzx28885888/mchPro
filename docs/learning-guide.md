@@ -45,7 +45,7 @@ The browser never receives the internal Agent token and never calls the LLM or J
 | `backend/src/main/java/com/excelai/excel` | Excel 文件读写和可供 Agent 调用的业务工具 | Workbook import/export and Agent-callable business tools |
 | `backend/src/main/java/com/example/agent/tool` | V1.6 Java Tool Registry、参数 Schema、执行和审计 | V1.6 Java Tool Registry, parameter schemas, execution, and audit |
 | `agent-service` | FastAPI、LangGraph、模型提供方与 Java HTTP 代理 | FastAPI, LangGraph, model providers, and Java HTTP proxy |
-| `infra/init.sql` | PostgreSQL 表、外键、索引和开发套餐种子数据 | PostgreSQL tables, foreign keys, indexes, and development plan seeds |
+| `backend/src/main/resources/db/migration/V1__initial_schema.sql` | Flyway 基础迁移：PostgreSQL 表、外键、索引和开发套餐种子数据 | Flyway baseline migration: PostgreSQL tables, foreign keys, indexes, and development plan seeds |
 
 ## 4. 关键配置 / Configuration map
 

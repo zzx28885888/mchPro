@@ -9,6 +9,7 @@ import com.excelai.usage.UsageService;
 import com.excelai.user.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
@@ -30,21 +31,19 @@ public class TaskService {
     private final UserRepository users;
     private final PlanRepository plans;
     private final UsageService usage;
-    private final TaskWorker worker;
     private final TaskRedisService redis;
     private final ExcelService excel;
     private final FileStorageService storage;
     private final ObjectMapper mapper;
 
     public TaskService(TaskRepository t, FileRepository f, UserRepository u, PlanRepository p,
-                       UsageService x, TaskWorker w, TaskRedisService r, ExcelService e,
+                       UsageService x, TaskRedisService r, ExcelService e,
                        FileStorageService s, ObjectMapper m) {
         tasks = t;
         files = f;
         users = u;
         plans = p;
         usage = x;
-        worker = w;
         redis = r;
         excel = e;
         storage = s;
@@ -92,11 +91,13 @@ public class TaskService {
         return result;
     }
 
+    @Transactional
     public Long create(Long uid, List<Long> fileIds, String workflowName, Map<String, Object> options,
                        String prompt, String previewFingerprint) {
         return createInternal(uid, fileIds, workflowName, options, prompt, previewFingerprint, false);
     }
 
+    @Transactional
     public Long create(Long uid, Long fileId, String prompt) {
         return createInternal(uid, List.of(fileId), WorkflowType.FREEFORM.name(), Map.of(), prompt, null, true);
     }
@@ -132,14 +133,7 @@ public class TaskService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid workflow options");
         }
         Long id = tasks.create(uid, inputIds, workflow.name(), optionsJson, normalizedPrompt);
-        try {
-            usage.consume(uid, id);
-        } catch (RuntimeException e) {
-            tasks.fail(id, e.getMessage());
-            throw e;
-        }
-        redis.update(id, "QUEUED", 0, null, null);
-        worker.submit(id, uid, inputIds, workflow.name(), normalizedOptions, normalizedPrompt, plan.maxToolCalls());
+        usage.consume(uid, id);
         if (!legacy) redis.deletePreview(uid, previewFingerprint);
         return id;
     }

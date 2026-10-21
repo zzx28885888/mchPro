@@ -1,5 +1,6 @@
 package com.excelai.auth;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,12 +24,12 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    Map<String, Object> register(@RequestBody Req r) {
+    Map<String, Object> register(@Valid @RequestBody Req r) {
         return Map.of("userId", s.register(r.email(), r.password()));
     }
 
     @PostMapping("/login")
-    Map<String, Object> login(@RequestBody Req r) {
+    Map<String, Object> login(@Valid @RequestBody Req r) {
         return Map.of("token", s.login(r.email(), r.password()));
     }
 }

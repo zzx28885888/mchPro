@@ -1,6 +1,9 @@
 package com.example.agent.controller;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,26 +23,28 @@ public class HealthController {
     }
 
     @GetMapping("/api/health")
-    public Object health() throws Exception {
-        // 中文：数据库连接可借出即视为可用；Redis 使用 PING 验证连接。
-        // English: A successfully acquired JDBC connection indicates database availability; Redis is checked with PING.
+    public ResponseEntity<java.util.Map<String, Object>> health() {
+        // 中文：使用 JDBC isValid 验证数据库连接；Redis 使用 PING 验证连接。
+        // English: Validate the JDBC connection with isValid; check Redis with PING.
         boolean db = false;
         boolean redisOk = false;
 
-        try (Connection ignored = dataSource.getConnection()) {
-            db = true;
-        }
-
-        try {
-            redisOk = "PONG".equalsIgnoreCase(redis.getConnectionFactory()
-                    .getConnection().ping());
+        try (Connection connection = dataSource.getConnection()) {
+            db = connection.isValid(1);
         } catch (Exception ignored) {
+            db = false;
         }
 
-        return java.util.Map.of(
-                "status", "UP",
+        try (RedisConnection connection = redis.getConnectionFactory().getConnection()) {
+            redisOk = "PONG".equalsIgnoreCase(connection.ping());
+        } catch (Exception ignored) {
+            redisOk = false;
+        }
+
+        HttpStatus status = db && redisOk ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE;
+        return ResponseEntity.status(status).body(java.util.Map.of(
+                "status", db && redisOk ? "UP" : "DOWN",
                 "postgres", db,
-                "redis", redisOk
-        );
+                "redis", redisOk));
     }
 }

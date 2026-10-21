@@ -2,10 +2,12 @@ package com.excelai.task;
 
 import com.excelai.agent.AgentService;
 import com.excelai.file.FileRepository;
-import org.springframework.scheduling.annotation.Async;
+import com.excelai.plan.PlanRepository;
+import com.excelai.user.UserRepository;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
-import java.util.List;
 import java.util.Map;
 
 @Service
@@ -16,42 +18,43 @@ import java.util.Map;
 public class TaskWorker {
     private final TaskRepository tasks;
     private final FileRepository files;
+    private final UserRepository users;
+    private final PlanRepository plans;
     private final AgentService agent;
-    private final TaskRedisService redis;
     private final TaskDataService taskData;
+    private final ObjectMapper mapper;
 
-    public TaskWorker(TaskRepository t, FileRepository f, AgentService a, TaskRedisService r, TaskDataService d) {
+    public TaskWorker(TaskRepository t, FileRepository f, UserRepository u, PlanRepository p,
+                      AgentService a, TaskDataService d, ObjectMapper m) {
         tasks = t;
         files = f;
+        users = u;
+        plans = p;
         agent = a;
-        redis = r;
         taskData = d;
+        mapper = m;
     }
 
-    public void submit(Long id, Long uid, Long fileId, String prompt, int maxCalls) {
-        submit(id, uid, List.of(fileId), WorkflowType.FREEFORM.name(), Map.of(), prompt, maxCalls);
-    }
-
-    @Async("taskExecutor")
-    public void submit(Long id, Long uid, List<Long> fileIds, String workflowType,
-                       Map<String, Object> options, String prompt, int maxCalls) {
-        // 中文：@Async 使用有界任务线程池；方法返回不代表 Agent 任务已经完成。
-        // English: @Async uses the bounded task pool; returning does not mean the Agent task is complete.
-        tasks.running(id);
-        redis.update(id, "RUNNING", 10, null, null);
+    public void run(Long id) {
         try {
+            TaskRepository.Task task = tasks.findById(id);
+            if (task == null) throw new IllegalStateException("Task not found");
+            Long uid = task.userId();
+            var user = users.findById(uid);
+            var plan = user == null ? null : plans.findByCode(user.planCode());
+            if (plan == null) throw new IllegalStateException("User plan unavailable");
+            var fileIds = tasks.inputFileIds(id);
+            Map<String, Object> options = mapper.readValue(task.workflowOptions(), new TypeReference<>() { });
             for (Long fileId : fileIds) {
                 if (files.findOwned(fileId, uid) == null) throw new IllegalArgumentException("input file not found");
             }
-            agent.execute(uid, id, fileIds, workflowType, options, prompt, maxCalls);
+            agent.execute(uid, id, fileIds, task.workflowType(), options, task.prompt(), plan.maxToolCalls());
             Long result = taskData.result(id);
             if (result == null) throw new IllegalStateException("Agent completed without exporting a result workbook");
             tasks.done(id, result);
-            redis.update(id, "COMPLETED", 100, null, result);
         } catch (Exception e) {
             String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             tasks.fail(id, message);
-            redis.update(id, "FAILED", 100, message, null);
         } finally {
             taskData.clear(id);
         }

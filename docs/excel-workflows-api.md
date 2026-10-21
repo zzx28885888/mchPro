@@ -40,6 +40,6 @@ Poll `GET /api/tasks/{taskId}`. On completion, `resultSummary` contains the work
 
 轮询 `GET /api/tasks/{taskId}`。任务完成后，`resultSummary` 包含工作流类型、操作定义、输出工作表行数、分类计数、警告和完整逐行异常。结果文件通过常规的用户归属下载接口获取。
 
-The database migration `infra/migrations/001_excel_workflows.sql` adds the workflow fields and plan grants for existing databases. It is idempotent; apply it after the base schema has created the task and plan-permission tables.
+Flyway migration `backend/src/main/resources/db/migration/V2__excel_workflows.sql` adds workflow fields and plan grants. It is idempotent and runs after V1 for a new database; existing databases from the former bootstrap path are baselined at V1 before V2 runs.
 
-数据库迁移 `infra/migrations/001_excel_workflows.sql` 为现有数据库增加工作流字段和套餐工具授权。该迁移可重复执行；请在基础 schema 创建任务表和套餐权限表后应用。
+Flyway 迁移 `backend/src/main/resources/db/migration/V2__excel_workflows.sql` 会增加工作流字段和套餐工具授权。该迁移可重复执行；新数据库由 V1 后执行 V2，旧初始化流程创建的数据库先基线到 V1 再执行 V2。
