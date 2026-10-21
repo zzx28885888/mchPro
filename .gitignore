@@ -1,5 +1,10 @@
 # 中文/English：本机秘密与配置，不进入版本控制 / Local secrets and developer-specific configuration; never commit.
 .env
+# 中文/English：本机 OpenCode 模型配置 / Local OpenCode model configuration.
+opencode.json
+# 中文/English：DeepSeek Harness 本地状态与会话数据 / Local DeepSeek Harness state and session data.
+.dsh-home/
+**/.dsh-home/
 # 中文/English：IDE 与操作系统本机文件 / IDE and operating-system-specific files.
 .idea/
 .vscode/
