@@ -114,7 +114,7 @@ docker compose ps
 ### 2. Ollama
 
 ```powershell
-ollama pull qwen3:8b
+ollama pull qwen3.5:9b
 ollama list
 ```
 
