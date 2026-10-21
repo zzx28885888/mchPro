@@ -57,7 +57,7 @@ services:
     environment:
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:9b}
       REMOTE_LLM_BASE_URL: ${REMOTE_LLM_BASE_URL:-}
       REMOTE_LLM_API_KEY: ${REMOTE_LLM_API_KEY:-}
       REMOTE_LLM_MODEL: ${REMOTE_LLM_MODEL:-}

@@ -56,7 +56,7 @@ def build_graph():
         )
     else:
         model = ChatOllama(
-            model=os.getenv("OLLAMA_MODEL", "qwen3:8b"),
+            model=os.getenv("OLLAMA_MODEL", "qwen3.5:9b"),
             base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
             temperature=0,
         )
