@@ -10,8 +10,8 @@ Record the model provider, model name, input/output/cached-input token counts, m
 
 ## 当前项目状态 / Current Project State
 
-- 项目默认启用 `LLM_PROVIDER=ollama` 和 `OLLAMA_MODEL=qwen3:8b`；远程 OpenAI 兼容 API 只有在切换到 remote 模式并配置本地私密环境变量后才会启用。
-- The project currently enables `LLM_PROVIDER=ollama` and `OLLAMA_MODEL=qwen3:8b` by default. A remote OpenAI-compatible API is enabled only after switching to remote mode and configuring private local environment variables.
+- 项目默认启用 `LLM_PROVIDER=ollama` 和 `OLLAMA_MODEL=qwen3.5:9b`；远程 OpenAI 兼容 API 只有在切换到 remote 模式并配置本地私密环境变量后才会启用。
+- The project currently enables `LLM_PROVIDER=ollama` and `OLLAMA_MODEL=qwen3.5:9b` by default. A remote OpenAI-compatible API is enabled only after switching to remote mode and configuring private local environment variables.
 - Python Agent 使用 LangGraph 与 LangChain 的 `ChatOllama` / `ChatOpenAI`。Agent HTTP 响应当前返回回答和消息；Spring 的 `AgentService` 只读取回答，项目没有持久化模型 token 用量。
 - The Python Agent uses LangGraph and LangChain `ChatOllama` / `ChatOpenAI`. The Agent HTTP response currently returns the answer and messages; Spring's `AgentService` reads only the answer, and the project does not persist model token usage.
 - 现有 `usage_record` 用于用户套餐任务额度，不代表 LLM token 费用；本设计新增独立的模型用量记录，不改变用户套餐额度。
@@ -23,8 +23,8 @@ Record the model provider, model name, input/output/cached-input token counts, m
 - Aggregate usage across all model turns in each Agent execution, linked by task ID and a unique execution ID so task retries remain distinguishable.
 - 每次执行保存供应商、模型名、输入 token、输出 token、缓存输入 token、模型调用次数、模型调用总耗时和测量状态。
 - Store provider, model name, input tokens, output tokens, cached input tokens, model-call count, total model-call duration, and measurement status for each execution.
-- 对照模型为当前配置的本地 Ollama `qwen3:8b` 与 DeepSeek Flash 远程 API。远程 API 密钥只能由用户配置在本机私密 `.env` 中，不进入仓库、规格、计划、数据库或普通日志。
-- Compare the currently configured local Ollama `qwen3:8b` model with the DeepSeek Flash remote API. The remote API key must be configured by the user in a private local `.env` file and must not enter the repository, specifications, plans, database, or ordinary logs.
+- 对照模型为当前使用的本地 Ollama `qwen3.5:9b` 与 DeepSeek Flash 远程 API。远程 API 密钥只能由用户配置在本机私密 `.env` 中，不进入仓库、规格、计划、数据库或普通日志。
+- Compare the currently used local Ollama `qwen3.5:9b` model with the DeepSeek Flash remote API. The remote API key must be configured by the user in a private local `.env` file and must not enter the repository, specifications, plans, database, or ordinary logs.
 - 使用虚构工作簿与任务描述，覆盖自由处理、合并清洗、两表对账、汇总四类工作流。每类工作流在每种模型下运行 3 次，共 12 次本地执行和 12 次远程执行。
 - Use synthetic workbooks and task instructions for freeform processing, merge-and-clean, two-table reconciliation, and summary workflows. Run each workflow three times per model, for 12 local runs and 12 remote runs.
 - 报告每种工作流的 token 用量、远程 API 费用、模型调用时间和结果正确性；不把小样本结果描述为保证值。
@@ -106,8 +106,8 @@ All benchmark workbooks use synthetic content created for this experiment; do no
 6. Prompts, model answers, workbook contents, and keys do not appear in the usage table or ordinary logs.
 7. 用量存储失败不会改变用户任务的成功/失败状态；对照报告会把缺失测量标为不可用于费用比较。
 8. Metering persistence failure does not change the user's task success/failure state; the comparison report marks missing measurements as ineligible for cost comparison.
-9. 对照报告包含本地 Qwen3:8B 和远程 DeepSeek Flash 的结果，每条工作流路线 3 次运行；费用注明官方价格来源与检索日期，并把本地固定运营成本单独列出或标明待测。
-10. The comparison report includes local Qwen3:8B and remote DeepSeek Flash, with three runs per workflow on each route; remote costs cite the official rate source and lookup date, while local fixed operating costs are listed separately or marked as unmeasured.
+9. 对照报告包含本地 Qwen3.5:9B 和远程 DeepSeek Flash 的结果，每条工作流路线 3 次运行；费用注明官方价格来源与检索日期，并把本地固定运营成本单独列出或标明待测。
+10. The comparison report includes local Qwen3.5:9B and remote DeepSeek Flash, with three runs per workflow on each route; remote costs cite the official rate source and lookup date, while local fixed operating costs are listed separately or marked as unmeasured.
 
 ## 排除范围 / Out of Scope
 

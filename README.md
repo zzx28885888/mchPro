@@ -113,8 +113,12 @@ docker compose ps
 
 ### 2. Ollama
 
+项目当前使用本地模型 `qwen3.5:9b`。
+
+The project currently uses the local model `qwen3.5:9b`.
+
 ```powershell
-ollama pull qwen3:8b
+ollama pull qwen3.5:9b
 ollama list
 ```
 

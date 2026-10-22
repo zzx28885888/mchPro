@@ -4,6 +4,7 @@ English: Defines LangGraph conversation state, provider selection, and the tool-
 
 import json
 import os
+import time
 from typing import Annotated, Any, TypedDict
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
@@ -14,6 +15,8 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
 from java_langgraph_tools import JAVA_TOOLS
+from java_tool_client import request_context
+from usage_metering import TurnUsage, extract_turn_usage
 
 
 class AgentState(TypedDict):
@@ -56,7 +59,7 @@ def build_graph():
         )
     else:
         model = ChatOllama(
-            model=os.getenv("OLLAMA_MODEL", "qwen3:8b"),
+            model=os.getenv("OLLAMA_MODEL", "qwen3.5:9b"),
             base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
             temperature=0,
         )
@@ -75,7 +78,21 @@ def build_graph():
             # English: Expose only workflow type and confirmed options; never expose user, task, file IDs, or paths.
             metadata = json.dumps({"workflowType": workflow_type, "options": workflow_context.get("options", {})}, ensure_ascii=False)
             messages = [messages[0], SystemMessage(content=f"Trusted workflow metadata: {metadata}"), *messages[1:]]
-        response = await model.ainvoke(messages)
+        provider_code = provider if provider not in {"remote", "openai", "openai-compatible"} else os.getenv("REMOTE_LLM_PROVIDER", "openai-compatible").strip().lower()
+        model_name = os.getenv("REMOTE_LLM_MODEL", "") if provider in {"remote", "openai", "openai-compatible"} else os.getenv("OLLAMA_MODEL", "qwen3.5:9b")
+        started = time.perf_counter()
+        try:
+            response = await model.ainvoke(messages)
+        except Exception:
+            duration_ms = round((time.perf_counter() - started) * 1000)
+            request_context.get().setdefault("usageTurns", []).append(
+                TurnUsage(provider_code, model_name, None, None, None, duration_ms)
+            )
+            raise
+        duration_ms = round((time.perf_counter() - started) * 1000)
+        request_context.get().setdefault("usageTurns", []).append(
+            extract_turn_usage(response, provider_code, model_name, duration_ms=duration_ms)
+        )
         return {"messages": [response]}
 
     def route(state: AgentState):
